@@ -300,7 +300,7 @@ const AnalyticsDashboard: React.FC = () => {
                 ✅ Mastered Topics
               </h3>
               <div className="flex flex-wrap gap-2">
-                {learningStats.topicsMastered.length > 0 ? (
+                {learningStats?.topicsMastered && learningStats.topicsMastered.length > 0 ? (
                   learningStats.topicsMastered.map((topic, index) => (
                     <span
                       key={index}
@@ -320,7 +320,7 @@ const AnalyticsDashboard: React.FC = () => {
                 🚀 In Progress
               </h3>
               <div className="flex flex-wrap gap-2">
-                {learningStats.topicsInProgress.length > 0 ? (
+                {learningStats?.topicsInProgress && learningStats.topicsInProgress.length > 0 ? (
                   learningStats.topicsInProgress.map((topic, index) => (
                     <span
                       key={index}
