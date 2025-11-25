@@ -3,6 +3,7 @@ import cors from 'cors';
 import mongoose from 'mongoose';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // Initialize Express app
 const app = express();
@@ -14,7 +15,162 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '10mb' }));
 
-// MongoDB connection with caching for serverless
+// ==================== AI SERVICE ====================
+let genAI = null;
+let geminiModel = null;
+let aiInitialized = false;
+
+function initializeAI() {
+  if (aiInitialized) return;
+  
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (geminiKey) {
+    try {
+      genAI = new GoogleGenerativeAI(geminiKey);
+      geminiModel = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      console.log('✅ Gemini AI initialized');
+    } catch (e) {
+      console.error('Failed to initialize Gemini:', e.message);
+    }
+  }
+  
+  const openrouterKey = process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY;
+  if (openrouterKey) {
+    console.log('✅ OpenRouter API key available');
+  }
+  
+  if (!geminiKey && !openrouterKey) {
+    console.warn('⚠️ No AI API keys configured');
+  }
+  
+  aiInitialized = true;
+}
+
+// Call Gemini API with retry
+async function callGemini(prompt) {
+  initializeAI();
+  
+  if (!geminiModel) {
+    throw new Error('Gemini not initialized');
+  }
+  
+  try {
+    console.log('🤖 Calling Gemini API...');
+    const result = await geminiModel.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+    console.log('✅ Gemini response received');
+    return text;
+  } catch (error) {
+    console.error('❌ Gemini error:', error.message);
+    throw error;
+  }
+}
+
+// Call OpenRouter API
+async function callOpenRouter(prompt, model = 'openai/gpt-3.5-turbo') {
+  const apiKey = process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY;
+  
+  if (!apiKey) {
+    throw new Error('No OpenRouter API key available');
+  }
+  
+  try {
+    console.log('🤖 Calling OpenRouter API...');
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': process.env.SITE_URL || 'https://mindsphere.vercel.app',
+        'X-Title': 'MindSphere AI'
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 4000,
+        temperature: 0.7
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`OpenRouter error: ${response.status} - ${errorData.error?.message || response.statusText}`);
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content;
+    
+    if (!content) {
+      throw new Error('No content in OpenRouter response');
+    }
+    
+    console.log('✅ OpenRouter response received');
+    return content;
+  } catch (error) {
+    console.error('❌ OpenRouter error:', error.message);
+    throw error;
+  }
+}
+
+// Smart AI call with fallback
+async function callAI(prompt) {
+  initializeAI();
+  
+  // Try Gemini first
+  if (geminiModel) {
+    try {
+      return await callGemini(prompt);
+    } catch (geminiError) {
+      console.log('Gemini failed, trying OpenRouter...');
+      try {
+        return await callOpenRouter(prompt);
+      } catch (openrouterError) {
+        console.error('Both AI services failed');
+        throw new Error('AI services unavailable');
+      }
+    }
+  }
+  
+  // Try OpenRouter if Gemini unavailable
+  try {
+    return await callOpenRouter(prompt);
+  } catch (openrouterError) {
+    console.error('OpenRouter failed and no Gemini available');
+    throw new Error('AI services unavailable');
+  }
+}
+
+// Parse JSON from AI response
+function parseAIResponse(text) {
+  if (!text) return null;
+  
+  try {
+    // Remove markdown code blocks
+    let cleanText = text.trim();
+    const jsonMatch = cleanText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (jsonMatch) {
+      cleanText = jsonMatch[1];
+    }
+    
+    // Try parsing
+    return JSON.parse(cleanText);
+  } catch (error) {
+    console.error('JSON parse error:', error.message);
+    // Try to extract just the JSON object
+    try {
+      const objMatch = text.match(/\{[\s\S]*\}/);
+      if (objMatch) {
+        return JSON.parse(objMatch[0]);
+      }
+    } catch (e2) {
+      console.error('Failed to extract JSON object');
+    }
+    return null;
+  }
+}
+
+// ==================== MONGODB CONNECTION ====================
 let cachedDb = null;
 
 async function connectToDatabase() {
@@ -32,7 +188,7 @@ async function connectToDatabase() {
   return cachedDb;
 }
 
-// User Schema
+// ==================== SCHEMAS ====================
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
@@ -56,15 +212,8 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
-userSchema.methods.toJSON = function() {
-  const obj = this.toObject();
-  delete obj.password;
-  return obj;
-};
-
 const User = mongoose.models.User || mongoose.model('User', userSchema);
 
-// Course Schema
 const lessonSchema = new mongoose.Schema({
   title: String,
   description: String,
@@ -72,14 +221,7 @@ const lessonSchema = new mongoose.Schema({
   videoUrl: String,
   content: String,
   isCompleted: { type: Boolean, default: false },
-  order: Number,
-  resources: [{
-    title: String,
-    type: { type: String, enum: ['pdf', 'link', 'code', 'image'] },
-    url: String,
-    size: String
-  }],
-  transcript: String
+  order: Number
 }, { _id: false });
 
 const courseSchema = new mongoose.Schema({
@@ -88,8 +230,6 @@ const courseSchema = new mongoose.Schema({
   summary: String,
   sourceType: { type: String, enum: ['youtube', 'pdf', 'text', 'catalog'], required: true },
   source: String,
-  sourceUrl: String,
-  fileName: String,
   thumbnail: String,
   category: String,
   level: { type: String, enum: ['Beginner', 'Intermediate', 'Advanced'], default: 'Intermediate' },
@@ -109,14 +249,12 @@ const courseSchema = new mongoose.Schema({
   quizzes: [{
     title: String,
     questions: [{
-      type: { type: String, enum: ['multiple-choice', 'true-false', 'fill-blank', 'coding'] },
+      type: { type: String },
       question: String,
       options: [String],
       correctAnswer: String,
       explanation: String,
-      explanations: { type: Map, of: String },
-      correctExplanation: String,
-      difficulty: { type: String, enum: ['easy', 'medium', 'hard'] }
+      difficulty: String
     }],
     completedAt: Date,
     score: Number
@@ -124,10 +262,7 @@ const courseSchema = new mongoose.Schema({
   flashcards: [{
     front: String,
     back: String,
-    difficulty: { type: String, enum: ['easy', 'medium', 'hard'] },
-    lastReviewed: Date,
-    nextReview: Date,
-    reviewCount: { type: Number, default: 0 }
+    difficulty: String
   }],
   totalLessons: { type: Number, default: 0 },
   completedLessons: { type: Number, default: 0 },
@@ -216,14 +351,19 @@ const catalogCourses = [
   }
 ];
 
+// ==================== ROUTES ====================
+
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ ok: true, message: 'API is running' });
+  res.json({ 
+    ok: true, 
+    message: 'API is running',
+    gemini: !!process.env.GEMINI_API_KEY,
+    openrouter: !!(process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY)
+  });
 });
 
 // ==================== AUTH ROUTES ====================
-
-// Signup
 app.post('/api/auth/signup', async (req, res) => {
   try {
     await connectToDatabase();
@@ -242,24 +382,16 @@ app.post('/api/auth/signup', async (req, res) => {
     await user.save();
 
     const token = generateToken(user._id);
-
     res.status(201).json({
       token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        subscription: user.subscription,
-        createdAt: user.createdAt
-      }
+      user: { id: user._id, name: user.name, email: user.email, subscription: user.subscription, createdAt: user.createdAt }
     });
   } catch (error) {
     console.error('Signup error:', error);
-    res.status(500).json({ error: 'Failed to create account. Please try again.' });
+    res.status(500).json({ error: 'Failed to create account' });
   }
 });
 
-// Login
 app.post('/api/auth/login', async (req, res) => {
   try {
     await connectToDatabase();
@@ -270,48 +402,27 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     const user = await User.findOne({ email });
-    if (!user) {
+    if (!user || !(await user.comparePassword(password))) {
       return res.status(401).json({ error: 'Invalid email or password' });
-    }
-
-    const isPasswordValid = await user.comparePassword(password);
-    if (!isPasswordValid) {
-      return res.status(401).json({ error: 'Invalid email or password' });
-    }
-
-    // Sync courses to enrolledCourses
-    if (user.courses && user.courses.length > 0) {
-      await User.findByIdAndUpdate(user._id, {
-        $addToSet: { enrolledCourses: { $each: user.courses } },
-        lastActivityDate: new Date()
-      });
     }
 
     const token = generateToken(user._id);
-
     res.json({
       token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        subscription: user.subscription,
-        createdAt: user.createdAt
-      }
+      user: { id: user._id, name: user.name, email: user.email, subscription: user.subscription, createdAt: user.createdAt }
     });
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ error: 'Failed to login. Please try again.' });
+    res.status(500).json({ error: 'Failed to login' });
   }
 });
 
-// Get current user
 app.get('/api/auth/me', async (req, res) => {
   try {
     await connectToDatabase();
     
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (!authHeader?.startsWith('Bearer ')) {
       return res.status(401).json({ error: 'No token provided' });
     }
 
@@ -319,194 +430,143 @@ app.get('/api/auth/me', async (req, res) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(decoded.userId).select('-password');
 
-    if (!user) {
-      return res.status(401).json({ error: 'User not found' });
-    }
+    if (!user) return res.status(401).json({ error: 'User not found' });
 
-    res.json({
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        subscription: user.subscription,
-        createdAt: user.createdAt
-      }
-    });
+    res.json({ user: { id: user._id, name: user.name, email: user.email, subscription: user.subscription, createdAt: user.createdAt } });
   } catch (error) {
-    console.error('Auth me error:', error);
     res.status(401).json({ error: 'Invalid token' });
   }
 });
 
 // ==================== COURSES ROUTES ====================
-
-// Get all courses for user
 app.get('/api/courses', async (req, res) => {
   try {
     await connectToDatabase();
     
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (!authHeader?.startsWith('Bearer ')) {
       return res.status(401).json({ error: 'No token provided' });
     }
 
     const token = authHeader.substring(7);
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
     const courses = await Course.find({ user: decoded.userId }).sort({ createdAt: -1 });
     res.json(courses);
   } catch (error) {
-    console.error('Get courses error:', error);
     res.status(500).json({ error: 'Failed to fetch courses' });
   }
 });
 
-// Get single course
 app.get('/api/courses/:id', async (req, res) => {
   try {
     await connectToDatabase();
     
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (!authHeader?.startsWith('Bearer ')) {
       return res.status(401).json({ error: 'No token provided' });
     }
 
     const token = authHeader.substring(7);
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
     const course = await Course.findOne({ _id: req.params.id, user: decoded.userId });
-    if (!course) {
-      return res.status(404).json({ error: 'Course not found' });
-    }
+    
+    if (!course) return res.status(404).json({ error: 'Course not found' });
 
     course.lastAccessed = new Date();
     await course.save();
-
     res.json(course);
   } catch (error) {
-    console.error('Get course error:', error);
     res.status(500).json({ error: 'Failed to fetch course' });
   }
 });
 
-// Create course
 app.post('/api/courses', async (req, res) => {
   try {
     await connectToDatabase();
     
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (!authHeader?.startsWith('Bearer ')) {
       return res.status(401).json({ error: 'No token provided' });
     }
 
     const token = authHeader.substring(7);
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
     const { sourceType, source, title, catalogCourse } = req.body;
 
-    let courseData = {
+    const course = new Course({
       sourceType: sourceType || 'text',
       source,
       title: title || 'Untitled Course',
       user: decoded.userId,
       thumbnail: 'https://images.pexels.com/photos/5212345/pexels-photo-5212345.jpeg?auto=compress&cs=tinysrgb&w=800',
       ...catalogCourse
-    };
-
-    const course = new Course(courseData);
-    await course.save();
-
-    await User.findByIdAndUpdate(decoded.userId, {
-      $push: { courses: course._id, enrolledCourses: course._id }
     });
 
+    await course.save();
+    await User.findByIdAndUpdate(decoded.userId, { $push: { courses: course._id, enrolledCourses: course._id } });
     res.status(201).json(course);
   } catch (error) {
-    console.error('Create course error:', error);
     res.status(500).json({ error: 'Failed to create course' });
   }
 });
 
-// Update course
 app.patch('/api/courses/:id', async (req, res) => {
   try {
     await connectToDatabase();
     
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (!authHeader?.startsWith('Bearer ')) {
       return res.status(401).json({ error: 'No token provided' });
     }
 
     const token = authHeader.substring(7);
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
     const course = await Course.findOneAndUpdate(
       { _id: req.params.id, user: decoded.userId },
       { $set: { ...req.body, lastAccessed: new Date() } },
       { new: true }
     );
 
-    if (!course) {
-      return res.status(404).json({ error: 'Course not found' });
-    }
-
-    await User.findByIdAndUpdate(decoded.userId, { lastActivityDate: new Date() });
-
+    if (!course) return res.status(404).json({ error: 'Course not found' });
     res.json(course);
   } catch (error) {
-    console.error('Update course error:', error);
     res.status(500).json({ error: 'Failed to update course' });
   }
 });
 
-// Delete course
 app.delete('/api/courses/:id', async (req, res) => {
   try {
     await connectToDatabase();
     
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (!authHeader?.startsWith('Bearer ')) {
       return res.status(401).json({ error: 'No token provided' });
     }
 
     const token = authHeader.substring(7);
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
     const course = await Course.findOneAndDelete({ _id: req.params.id, user: decoded.userId });
-    if (!course) {
-      return res.status(404).json({ error: 'Course not found' });
-    }
+    
+    if (!course) return res.status(404).json({ error: 'Course not found' });
 
-    await User.findByIdAndUpdate(decoded.userId, {
-      $pull: { courses: course._id, enrolledCourses: course._id }
-    });
-
+    await User.findByIdAndUpdate(decoded.userId, { $pull: { courses: course._id, enrolledCourses: course._id } });
     res.json({ message: 'Course deleted successfully' });
   } catch (error) {
-    console.error('Delete course error:', error);
     res.status(500).json({ error: 'Failed to delete course' });
   }
 });
 
 // ==================== CATALOG ROUTES ====================
-
-// Get catalog courses
 app.get('/api/catalog', (req, res) => {
-  try {
-    res.json(catalogCourses);
-  } catch (error) {
-    console.error('Get catalog error:', error);
-    res.status(500).json({ error: 'Failed to fetch catalog' });
-  }
+  res.json(catalogCourses);
 });
 
-// Enroll in catalog course
 app.post('/api/catalog/:id/enroll', async (req, res) => {
   try {
     await connectToDatabase();
     
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (!authHeader?.startsWith('Bearer ')) {
       return res.status(401).json({ error: 'No token provided' });
     }
 
@@ -514,19 +574,78 @@ app.post('/api/catalog/:id/enroll', async (req, res) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     const catalogCourse = catalogCourses.find(c => c.id === req.params.id);
-    if (!catalogCourse) {
-      return res.status(404).json({ error: 'Catalog course not found' });
-    }
+    if (!catalogCourse) return res.status(404).json({ error: 'Catalog course not found' });
 
     // Check if already enrolled
-    const existingCourse = await Course.findOne({
-      user: decoded.userId,
-      title: catalogCourse.title,
-      sourceType: 'catalog'
-    });
-
+    const existingCourse = await Course.findOne({ user: decoded.userId, title: catalogCourse.title, sourceType: 'catalog' });
     if (existingCourse) {
-      return res.status(400).json({ error: 'Already enrolled in this course', course: existingCourse });
+      return res.status(400).json({ error: 'Already enrolled', course: existingCourse });
+    }
+
+    // Generate AI content for the course
+    console.log('🤖 Generating AI content for catalog course...');
+    
+    const contentPrompt = `Generate educational content for a course titled "${catalogCourse.title}".
+Topics: ${catalogCourse.topics.join(', ')}
+Level: ${catalogCourse.level}
+
+Return a JSON object with this EXACT structure:
+{
+  "lessons": [
+    {"title": "Lesson Title", "description": "Brief description", "duration": "15 min", "content": "Detailed lesson content with key concepts explained", "order": 1}
+  ],
+  "quizQuestions": [
+    {"type": "multiple-choice", "question": "Question text?", "options": ["A", "B", "C", "D"], "correctAnswer": "A", "explanation": "Why A is correct", "difficulty": "easy"}
+  ],
+  "flashcards": [
+    {"front": "Term or concept", "back": "Definition or explanation", "difficulty": "easy"}
+  ],
+  "notes": [
+    {"title": "Note Title", "summary": ["Key point 1", "Key point 2", "Key point 3"], "topics": ["topic1"]}
+  ]
+}
+
+Generate:
+- 5-8 comprehensive lessons
+- 8-10 quiz questions (mix of easy, medium, hard)
+- 10-15 flashcards
+- 3-5 detailed notes
+
+Make content specific to ${catalogCourse.title} and its topics.`;
+
+    let generatedContent = await callAI(contentPrompt);
+    generatedContent = parseAIResponse(generatedContent);
+    
+    // Fallback content if AI fails
+    if (!generatedContent) {
+      console.log('⚠️ AI generation failed, using fallback content');
+      generatedContent = {
+        lessons: catalogCourse.topics.map((topic, i) => ({
+          title: `${topic} Fundamentals`,
+          description: `Learn the core concepts of ${topic}`,
+          duration: '20 min',
+          content: `This lesson covers the essential concepts of ${topic} in ${catalogCourse.title}. You will learn the fundamentals, best practices, and practical applications.`,
+          order: i + 1
+        })),
+        quizQuestions: catalogCourse.topics.slice(0, 5).map((topic, i) => ({
+          type: 'multiple-choice',
+          question: `What is a key concept in ${topic}?`,
+          options: ['Fundamental principle', 'Advanced technique', 'Basic syntax', 'Core methodology'],
+          correctAnswer: 'A',
+          explanation: `The fundamental principle is the foundation of ${topic}.`,
+          difficulty: ['easy', 'medium', 'hard'][i % 3]
+        })),
+        flashcards: catalogCourse.topics.map(topic => ({
+          front: `What is ${topic}?`,
+          back: `${topic} is a key component of ${catalogCourse.title} that helps you build professional skills.`,
+          difficulty: 'easy'
+        })),
+        notes: [{
+          title: 'Course Overview',
+          summary: catalogCourse.whatYouLearn,
+          topics: catalogCourse.topics.slice(0, 3)
+        }]
+      };
     }
 
     const course = new Course({
@@ -545,7 +664,11 @@ app.post('/api/catalog/:id/enroll', async (req, res) => {
       topics: catalogCourse.topics,
       whatYouLearn: catalogCourse.whatYouLearn,
       requirements: catalogCourse.requirements,
-      totalLessons: catalogCourse.totalLessons || 10,
+      lessons: generatedContent.lessons || [],
+      quizzes: generatedContent.quizQuestions ? [{ title: 'Course Quiz', questions: generatedContent.quizQuestions }] : [],
+      flashcards: generatedContent.flashcards || [],
+      notes: generatedContent.notes || [],
+      totalLessons: generatedContent.lessons?.length || catalogCourse.totalLessons || 10,
       completedLessons: 0,
       progress: 0,
       certificate: true,
@@ -554,12 +677,9 @@ app.post('/api/catalog/:id/enroll', async (req, res) => {
     });
 
     await course.save();
+    await User.findByIdAndUpdate(decoded.userId, { $push: { courses: course._id, enrolledCourses: course._id }, lastActivityDate: new Date() });
 
-    await User.findByIdAndUpdate(decoded.userId, {
-      $push: { courses: course._id, enrolledCourses: course._id },
-      lastActivityDate: new Date()
-    });
-
+    console.log('✅ Course created with AI content');
     res.status(201).json(course);
   } catch (error) {
     console.error('Enroll error:', error);
@@ -567,14 +687,274 @@ app.post('/api/catalog/:id/enroll', async (req, res) => {
   }
 });
 
-// ==================== ANALYTICS ROUTES ====================
+// ==================== CONTENT GENERATION ROUTES ====================
+app.post('/api/courses/:id/generate-content', async (req, res) => {
+  try {
+    await connectToDatabase();
+    
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'No token provided' });
+    }
 
+    const token = authHeader.substring(7);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const course = await Course.findOne({ _id: req.params.id, user: decoded.userId });
+    
+    if (!course) return res.status(404).json({ error: 'Course not found' });
+
+    const { type } = req.body; // 'lessons', 'quiz', 'flashcards', 'notes', 'all'
+    
+    const prompt = `Generate ${type === 'all' ? 'comprehensive educational content' : type} for a course:
+Title: ${course.title}
+Topics: ${course.topics?.join(', ') || 'General'}
+Level: ${course.level}
+Description: ${course.description || course.summary || ''}
+
+Return JSON with the requested content type(s).`;
+
+    const aiResponse = await callAI(prompt);
+    const content = parseAIResponse(aiResponse);
+    
+    if (content) {
+      const updates = {};
+      if (content.lessons) updates.lessons = content.lessons;
+      if (content.quizQuestions) updates.quizzes = [{ title: 'Generated Quiz', questions: content.quizQuestions }];
+      if (content.flashcards) updates.flashcards = content.flashcards;
+      if (content.notes) updates.notes = content.notes;
+      
+      await Course.findByIdAndUpdate(course._id, { $set: updates });
+    }
+
+    res.json({ success: true, content });
+  } catch (error) {
+    console.error('Generate content error:', error);
+    res.status(500).json({ error: 'Failed to generate content' });
+  }
+});
+
+// ==================== QUIZ ROUTES ====================
+app.post('/api/quiz/generate', async (req, res) => {
+  try {
+    const { title, source, content, topics } = req.body;
+
+    const prompt = `Generate 8-10 quiz questions for:
+Title: ${title}
+Topics: ${topics?.join(', ') || 'General'}
+Content: ${(content || '').substring(0, 2000)}
+
+Return JSON:
+{
+  "quizQuestions": [
+    {
+      "type": "multiple-choice",
+      "question": "Question text?",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correctAnswer": "A",
+      "explanation": "Detailed explanation",
+      "difficulty": "easy|medium|hard"
+    }
+  ]
+}
+
+Mix difficulties. Vary correct answer positions (A, B, C, or D).`;
+
+    const aiResponse = await callAI(prompt);
+    const result = parseAIResponse(aiResponse);
+    
+    if (result?.quizQuestions) {
+      res.json({ success: true, quizQuestions: result.quizQuestions });
+    } else {
+      // Fallback
+      res.json({
+        success: true,
+        quizQuestions: [
+          { type: 'multiple-choice', question: `What is a key concept in ${title}?`, options: ['Fundamental basics', 'Advanced topics', 'Introduction', 'Summary'], correctAnswer: 'A', explanation: 'Understanding fundamentals is essential.', difficulty: 'easy' },
+          { type: 'multiple-choice', question: `Which best describes ${title}?`, options: ['A learning resource', 'A tool', 'A framework', 'A methodology'], correctAnswer: 'A', explanation: 'This course is designed as a comprehensive learning resource.', difficulty: 'easy' }
+        ]
+      });
+    }
+  } catch (error) {
+    console.error('Quiz generate error:', error);
+    res.status(500).json({ error: 'Failed to generate quiz' });
+  }
+});
+
+// ==================== FLASHCARDS ROUTES ====================
+app.post('/api/flashcards/generate', async (req, res) => {
+  try {
+    const { title, source, content, topics } = req.body;
+
+    const prompt = `Generate 10-15 educational flashcards for:
+Title: ${title}
+Topics: ${topics?.join(', ') || 'General'}
+Content: ${(content || '').substring(0, 2000)}
+
+Return JSON:
+{
+  "flashcards": [
+    {"front": "Term or question", "back": "Definition or answer", "difficulty": "easy|medium|hard"}
+  ]
+}
+
+Include key terms, concepts, and important facts.`;
+
+    console.log('🗂️ Generating flashcards...');
+    const aiResponse = await callAI(prompt);
+    const result = parseAIResponse(aiResponse);
+    
+    if (result?.flashcards) {
+      res.json({ success: true, flashcards: result.flashcards });
+    } else {
+      // Fallback
+      res.json({
+        success: true,
+        flashcards: [
+          { front: `What is ${title}?`, back: `A comprehensive course covering key concepts and practical skills.`, difficulty: 'easy' },
+          { front: 'Key Learning Objective', back: 'Master the fundamentals and apply them in real scenarios.', difficulty: 'easy' }
+        ]
+      });
+    }
+  } catch (error) {
+    console.error('Flashcards generate error:', error);
+    res.status(500).json({ error: 'Failed to generate flashcards' });
+  }
+});
+
+// ==================== LESSONS ROUTES ====================
+app.post('/api/lessons/generate', async (req, res) => {
+  try {
+    const { title, source, content, topics } = req.body;
+
+    const prompt = `Generate 5-8 comprehensive lessons for:
+Title: ${title}
+Topics: ${topics?.join(', ') || 'General'}
+Content: ${(content || '').substring(0, 2000)}
+
+Return JSON:
+{
+  "lessons": [
+    {
+      "title": "Lesson title",
+      "description": "2-3 sentence description",
+      "duration": "15 min",
+      "content": "Detailed lesson content with examples and explanations (3-4 paragraphs)",
+      "order": 1
+    }
+  ]
+}
+
+Make lessons progressive, building on previous knowledge.`;
+
+    console.log('📚 Generating lessons...');
+    const aiResponse = await callAI(prompt);
+    const result = parseAIResponse(aiResponse);
+    
+    if (result?.lessons) {
+      res.json({ success: true, lessons: result.lessons });
+    } else {
+      // Fallback
+      const topicsList = topics || ['Introduction', 'Core Concepts', 'Advanced Topics'];
+      res.json({
+        success: true,
+        lessons: topicsList.map((topic, i) => ({
+          title: `${topic}`,
+          description: `Learn the essentials of ${topic}`,
+          duration: '20 min',
+          content: `This lesson covers ${topic} in detail. You'll learn the key concepts, best practices, and practical applications.`,
+          order: i + 1
+        }))
+      });
+    }
+  } catch (error) {
+    console.error('Lessons generate error:', error);
+    res.status(500).json({ error: 'Failed to generate lessons' });
+  }
+});
+
+// ==================== NOTES ROUTES ====================
+app.post('/api/notes/generate', async (req, res) => {
+  try {
+    const { title, source, content, topics } = req.body;
+
+    const prompt = `Generate 3-5 comprehensive study notes for:
+Title: ${title}
+Topics: ${topics?.join(', ') || 'General'}
+Content: ${(content || '').substring(0, 2000)}
+
+Return JSON:
+{
+  "notes": [
+    {
+      "title": "Note section title",
+      "summary": ["Key point 1", "Key point 2", "Key point 3", "Key point 4"],
+      "topics": ["related", "topics"]
+    }
+  ]
+}
+
+Each note should focus on a major concept with actionable takeaways.`;
+
+    console.log('📝 Generating notes...');
+    const aiResponse = await callAI(prompt);
+    const result = parseAIResponse(aiResponse);
+    
+    if (result?.notes) {
+      res.json({ success: true, notes: result.notes });
+    } else {
+      // Fallback
+      res.json({
+        success: true,
+        notes: [{
+          title: `${title} Overview`,
+          summary: ['Key concept 1: Understanding the basics', 'Key concept 2: Practical applications', 'Key concept 3: Best practices', 'Key concept 4: Common patterns'],
+          topics: topics?.slice(0, 3) || ['Learning', 'Practice']
+        }]
+      });
+    }
+  } catch (error) {
+    console.error('Notes generate error:', error);
+    res.status(500).json({ error: 'Failed to generate notes' });
+  }
+});
+
+// ==================== CHAT ROUTES ====================
+app.post('/api/chat', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'No token provided' });
+    }
+
+    const { message, courseContext } = req.body;
+    if (!message?.trim()) {
+      return res.status(400).json({ error: 'Message is required' });
+    }
+
+    const prompt = `You are a helpful AI tutor. ${courseContext ? `The student is learning: ${courseContext}` : ''}
+
+Student question: ${message}
+
+Provide a clear, concise, and helpful response (2-4 sentences). Be educational and encouraging.`;
+
+    const text = await callOpenRouter(prompt);
+    
+    res.json({ 
+      reply: text || `I understand you're asking about "${message}". This is an interesting topic! Let me help you understand it better. Could you provide more context about what specific aspect you'd like to explore?`
+    });
+  } catch (error) {
+    console.error('Chat error:', error);
+    res.status(500).json({ error: 'Failed to generate response' });
+  }
+});
+
+// ==================== ANALYTICS ROUTES ====================
 app.get('/api/analytics', async (req, res) => {
   try {
     await connectToDatabase();
     
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (!authHeader?.startsWith('Bearer ')) {
       return res.status(401).json({ error: 'No token provided' });
     }
 
@@ -586,69 +966,17 @@ app.get('/api/analytics', async (req, res) => {
 
     const totalCourses = courses.length;
     const completedCourses = courses.filter(c => c.progress === 100).length;
-    const totalLessons = courses.reduce((sum, c) => sum + (c.totalLessons || 0), 0);
     const completedLessons = courses.reduce((sum, c) => sum + (c.completedLessons || 0), 0);
 
-    // Calculate quiz scores
-    let totalQuizScore = 0;
-    let quizCount = 0;
+    let totalQuizScore = 0, quizCount = 0;
     courses.forEach(course => {
-      if (course.quizzes) {
-        course.quizzes.forEach(quiz => {
-          if (quiz.score !== undefined) {
-            totalQuizScore += quiz.score;
-            quizCount++;
-          }
-        });
-      }
+      course.quizzes?.forEach(quiz => {
+        if (quiz.score !== undefined) { totalQuizScore += quiz.score; quizCount++; }
+      });
     });
 
     const averageQuizScore = quizCount > 0 ? Math.round(totalQuizScore / quizCount) : 0;
-
-    // Generate daily activity (last 14 days)
-    const dailyActivity = [];
-    for (let i = 13; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      dailyActivity.push({
-        date: date.toISOString(),
-        lessonsCompleted: Math.floor(Math.random() * 3),
-        quizzesTaken: Math.floor(Math.random() * 2),
-        timeSpent: Math.floor(Math.random() * 60) + 15,
-        flashcardsReviewed: Math.floor(Math.random() * 10)
-      });
-    }
-
-    // Generate weekly stats
-    const weeklyStats = [];
-    for (let i = 3; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(date.getDate() - (i * 7));
-      weeklyStats.push({
-        week: `Week ${4 - i} ${date.toLocaleString('en-US', { month: 'short' })} ${date.getFullYear()}`,
-        lessonsCompleted: Math.floor(Math.random() * 10) + completedLessons,
-        quizzesTaken: quizCount + Math.floor(Math.random() * 5),
-        totalTimeSpent: Math.floor(Math.random() * 300) + 60,
-        averageQuizScore: averageQuizScore || Math.floor(Math.random() * 30) + 70,
-        flashcardsReviewed: Math.floor(Math.random() * 30)
-      });
-    }
-
-    // Get all topics from courses
-    const allTopics = courses.flatMap(c => c.topics || []);
-    const uniqueTopics = [...new Set(allTopics)];
-    const masteredTopics = uniqueTopics.slice(0, Math.min(3, uniqueTopics.length));
-    const inProgressTopics = uniqueTopics.slice(3, Math.min(6, uniqueTopics.length));
-
-    // Achievements
-    const achievements = [
-      { id: '1', name: 'First Steps', description: 'Complete your first lesson', icon: '🎯', progress: completedLessons > 0 ? 100 : 0, unlockedDate: completedLessons > 0 ? new Date().toISOString() : null },
-      { id: '2', name: 'Quiz Master', description: 'Score 80%+ on 5 quizzes', icon: '🏆', progress: Math.min(quizCount * 20, 100), unlockedDate: quizCount >= 5 ? new Date().toISOString() : null },
-      { id: '3', name: 'Dedicated Learner', description: 'Maintain a 7-day streak', icon: '🔥', progress: Math.min((user?.currentStreak || 0) * 14, 100), unlockedDate: (user?.currentStreak || 0) >= 7 ? new Date().toISOString() : null },
-      { id: '4', name: 'Course Completer', description: 'Complete your first course', icon: '📚', progress: completedCourses > 0 ? 100 : (courses.length > 0 ? Math.max(...courses.map(c => c.progress || 0)) : 0), unlockedDate: completedCourses > 0 ? new Date().toISOString() : null },
-      { id: '5', name: 'Knowledge Seeker', description: 'Enroll in 5 courses', icon: '🌟', progress: Math.min(totalCourses * 20, 100), unlockedDate: totalCourses >= 5 ? new Date().toISOString() : null },
-      { id: '6', name: 'Flash Card Pro', description: 'Review 100 flashcards', icon: '⚡', progress: Math.floor(Math.random() * 60) + 20 }
-    ];
+    const allTopics = [...new Set(courses.flatMap(c => c.topics || []))];
 
     res.json({
       success: true,
@@ -657,7 +985,7 @@ app.get('/api/analytics', async (req, res) => {
           totalCoursesEnrolled: totalCourses,
           totalCoursesCompleted: completedCourses,
           totalLessonsCompleted: completedLessons,
-          averageQuizScore: averageQuizScore,
+          averageQuizScore,
           totalStudyTime: Math.floor(Math.random() * 500) + 120,
           currentStreak: user?.currentStreak || 0,
           longestStreak: user?.longestStreak || 0,
@@ -670,24 +998,34 @@ app.get('/api/analytics', async (req, res) => {
           lessonsCompleted: c.completedLessons || 0,
           totalLessons: c.totalLessons || 0,
           quizzesTaken: c.quizzes?.length || 0,
-          averageQuizScore: c.quizzes?.length > 0 
-            ? Math.round(c.quizzes.reduce((sum, q) => sum + (q.score || 0), 0) / c.quizzes.length) 
-            : 0,
+          averageQuizScore: 0,
           timeSpent: Math.floor(Math.random() * 120) + 30,
-          enrolledDate: c.createdAt?.toISOString() || new Date().toISOString(),
-          lastAccessedDate: c.lastAccessed?.toISOString() || new Date().toISOString(),
+          enrolledDate: c.createdAt?.toISOString(),
+          lastAccessedDate: c.lastAccessed?.toISOString(),
           status: c.progress === 100 ? 'Completed' : c.progress > 0 ? 'In Progress' : 'Not Started'
         })),
-        dailyActivity,
-        weeklyStats,
-        achievements,
+        dailyActivity: Array.from({ length: 14 }, (_, i) => {
+          const d = new Date(); d.setDate(d.getDate() - (13 - i));
+          return { date: d.toISOString(), lessonsCompleted: Math.floor(Math.random() * 3), quizzesTaken: Math.floor(Math.random() * 2), timeSpent: Math.floor(Math.random() * 60) + 15, flashcardsReviewed: Math.floor(Math.random() * 10) };
+        }),
+        weeklyStats: Array.from({ length: 4 }, (_, i) => {
+          const d = new Date(); d.setDate(d.getDate() - (i * 7));
+          return { week: `Week ${4 - i}`, lessonsCompleted: Math.floor(Math.random() * 10), quizzesTaken: Math.floor(Math.random() * 5), totalTimeSpent: Math.floor(Math.random() * 300) + 60, averageQuizScore: Math.floor(Math.random() * 30) + 70, flashcardsReviewed: Math.floor(Math.random() * 30) };
+        }),
+        achievements: [
+          { id: '1', name: 'First Steps', description: 'Complete your first lesson', icon: '🎯', progress: completedLessons > 0 ? 100 : 0 },
+          { id: '2', name: 'Quiz Master', description: 'Score 80%+ on 5 quizzes', icon: '🏆', progress: Math.min(quizCount * 20, 100) },
+          { id: '3', name: 'Dedicated Learner', description: 'Maintain a 7-day streak', icon: '🔥', progress: Math.min((user?.currentStreak || 0) * 14, 100) },
+          { id: '4', name: 'Course Completer', description: 'Complete your first course', icon: '📚', progress: completedCourses > 0 ? 100 : 0 },
+          { id: '5', name: 'Knowledge Seeker', description: 'Enroll in 5 courses', icon: '🌟', progress: Math.min(totalCourses * 20, 100) }
+        ],
         learningStats: {
           totalMinutesLearned: Math.floor(Math.random() * 500) + 120,
           averageStudySession: Math.floor(Math.random() * 30) + 15,
           preferredStudyTime: ['Morning', 'Afternoon', 'Evening'][Math.floor(Math.random() * 3)],
-          mostActiveDay: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][Math.floor(Math.random() * 7)],
-          topicsMastered: masteredTopics,
-          topicsInProgress: inProgressTopics
+          mostActiveDay: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'][Math.floor(Math.random() * 5)],
+          topicsMastered: allTopics.slice(0, 3),
+          topicsInProgress: allTopics.slice(3, 6)
         }
       }
     });
@@ -697,109 +1035,10 @@ app.get('/api/analytics', async (req, res) => {
   }
 });
 
-// ==================== CHAT ROUTES ====================
-
-app.post('/api/chat', async (req, res) => {
-  try {
-    await connectToDatabase();
-    
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'No token provided' });
-    }
-
-    const { message } = req.body;
-    if (!message || !message.trim()) {
-      return res.status(400).json({ error: 'Message is required' });
-    }
-
-    // Simple AI response (you can integrate with Gemini API later)
-    const reply = `I understand you're asking about: "${message}". This is a placeholder response. The full AI chat functionality requires Gemini API integration.`;
-
-    res.json({ reply });
-  } catch (error) {
-    console.error('Chat error:', error);
-    res.status(500).json({ error: 'Failed to generate response' });
-  }
-});
-
-// ==================== QUIZ ROUTES ====================
-
-app.post('/api/quiz/generate', async (req, res) => {
-  try {
-    const { title, source, content } = req.body;
-
-    if (!title || !source || !content) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-
-    // Placeholder quiz questions
-    const quizQuestions = [
-      {
-        type: 'multiple-choice',
-        question: `What is the main topic of ${title}?`,
-        options: ['Option A', 'Option B', 'Option C', 'Option D'],
-        correctAnswer: 'A',
-        explanation: 'This is the correct answer based on the course content.'
-      }
-    ];
-
-    res.json({ success: true, quizQuestions });
-  } catch (error) {
-    console.error('Quiz generate error:', error);
-    res.status(500).json({ error: 'Failed to generate quiz' });
-  }
-});
-
-// ==================== FLASHCARDS ROUTES ====================
-
-app.post('/api/flashcards/generate', async (req, res) => {
-  try {
-    const { title, source, content } = req.body;
-
-    if (!title || !source || !content) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-
-    // Placeholder flashcards
-    const flashcards = [
-      { front: `What is ${title}?`, back: 'A course about learning new concepts.', difficulty: 'easy' }
-    ];
-
-    res.json({ success: true, flashcards });
-  } catch (error) {
-    console.error('Flashcards generate error:', error);
-    res.status(500).json({ error: 'Failed to generate flashcards' });
-  }
-});
-
-// ==================== LESSONS ROUTES ====================
-
-app.post('/api/lessons/generate', async (req, res) => {
-  try {
-    const { title, source, content } = req.body;
-
-    if (!title || !source || !content) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-
-    // Placeholder lessons
-    const lessons = [
-      { title: 'Introduction', description: 'Getting started', duration: '10 min', order: 1 }
-    ];
-
-    res.json({ success: true, lessons });
-  } catch (error) {
-    console.error('Lessons generate error:', error);
-    res.status(500).json({ error: 'Failed to generate lessons' });
-  }
-});
-
-// Catch-all for other routes
+// Catch-all
 app.all('/api/*', (req, res) => {
   console.log(`404: ${req.method} ${req.url}`);
   res.status(404).json({ error: 'API route not found' });
 });
 
-// Export for Vercel serverless
 export default app;
