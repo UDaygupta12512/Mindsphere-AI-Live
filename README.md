@@ -1,4 +1,4 @@
-# MindSphere AI - Intelligent Learning Platform
+# MindSphere AI - Intelligent Learning Platform  
 
 > **AI-Powered Educational Excellence** 🚀
 
