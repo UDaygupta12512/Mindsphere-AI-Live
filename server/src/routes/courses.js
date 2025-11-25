@@ -1,7 +1,3 @@
-
-
-
-
 import express from 'express';
 import Course from '../models/Course.js';
 import User from '../models/User.js';
@@ -330,7 +326,7 @@ router.post('/', async (req, res) => {
     // Fetch YouTube videos for lessons
     console.log('🎬 Fetching YouTube videos for lessons...');
     const hasYoutubeKey = !!process.env.YOUTUBE_API_KEY;
-    
+    console.log('YouTube API key present:', hasYoutubeKey, '| Value:', process.env.YOUTUBE_API_KEY ? '[SET]' : '[NOT SET]');
     if (hasYoutubeKey) {
       // Use YouTube Data API if key is available
       console.log('🔑 Using YouTube Data API (API key available)');

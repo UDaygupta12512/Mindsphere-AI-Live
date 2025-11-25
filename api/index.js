@@ -1042,7 +1042,7 @@ Return JSON:
 Make lessons progressive, building on previous knowledge.`;
 
     console.log('📚 Generating lessons...');
-    const aiResponse = await callAIForContent(prompt);
+    const aiResponse = await callGemini(prompt);
     const result = parseAIResponse(aiResponse);
     
     if (result?.lessons) {
@@ -1091,7 +1091,7 @@ Return JSON:
 Each note should focus on a major concept with actionable takeaways.`;
 
     console.log('📝 Generating notes...');
-    const aiResponse = await callAIForContent(prompt);
+    const aiResponse = await callGemini(prompt);
     const result = parseAIResponse(aiResponse);
     
     if (result?.notes) {
