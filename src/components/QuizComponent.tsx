@@ -360,4 +360,4 @@ const QuizComponent: React.FC<QuizComponentProps> = ({ quizzes, onComplete, cour
   );
 };
 
-export default QuizComponent;
+export default QuizComponent; 

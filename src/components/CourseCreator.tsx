@@ -204,4 +204,4 @@ const CourseCreator: React.FC<CourseCreatorProps> = ({ onCourseCreated }) => {
   );
 };
 
-export default CourseCreator;
+export default CourseCreator; 

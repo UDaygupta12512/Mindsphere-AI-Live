@@ -169,4 +169,4 @@ const Header: React.FC<HeaderProps> = ({ onNavigate, currentView, user, onAuthCl
   );
 };
 
-export default Header;
+export default Header; 

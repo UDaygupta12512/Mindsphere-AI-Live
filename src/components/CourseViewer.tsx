@@ -536,4 +536,4 @@ const CourseViewer: React.FC<CourseViewerProps> = ({ course, onBack, onUpdateCou
   );
 };
 
-export default CourseViewer;
+export default CourseViewer; 

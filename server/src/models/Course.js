@@ -149,3 +149,4 @@ courseSchema.index({ sourceType: 1 });
 const Course = mongoose.model('Course', courseSchema);
 
 export default Course;
+ 

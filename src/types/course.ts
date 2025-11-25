@@ -96,4 +96,4 @@ export interface ChatMessage {
   content: string;
   timestamp: Date;
   courseContext?: string;
-}
+} 

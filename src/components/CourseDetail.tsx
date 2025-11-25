@@ -308,3 +308,4 @@ const CourseDetail: React.FC<CourseDetailProps> = ({
 };
 
 export default CourseDetail;
+ 

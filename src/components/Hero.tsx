@@ -123,4 +123,4 @@ const Hero: React.FC<HeroProps> = ({ onGetStarted }) => {
   );
 };
 
-export default Hero;
+export default Hero; 

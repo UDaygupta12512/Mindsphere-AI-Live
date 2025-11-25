@@ -283,4 +283,4 @@ const CourseCatalog: React.FC<CourseCatalogProps> = ({ onCourseSelect, enrolledC
   );
 };
 
-export default CourseCatalog;
+export default CourseCatalog; 

@@ -256,4 +256,4 @@ const generateFallbackLessons = (title: string) => {
       order: 3
     }
   ];
-};
+}; 

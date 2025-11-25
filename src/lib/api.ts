@@ -185,3 +185,4 @@ export const chatApi = {
 export const healthCheck = () => {
   return api.get<{ ok: boolean }>('/api/health');
 };
+ 

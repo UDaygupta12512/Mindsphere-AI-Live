@@ -221,4 +221,4 @@ const FlashcardsComponent: React.FC<FlashcardsComponentProps> = ({ flashcards, o
   );
 };
 
-export default FlashcardsComponent;
+export default FlashcardsComponent; 

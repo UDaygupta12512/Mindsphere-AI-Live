@@ -260,3 +260,4 @@ export const getCategories = (): string[] => {
   const categories = new Set(catalogCourses.map(course => course.category));
   return Array.from(categories);
 };
+ 

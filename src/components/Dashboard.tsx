@@ -202,4 +202,4 @@ const Dashboard: React.FC<DashboardProps> = ({ courses, onSelectCourse, onCreate
   );
 };
 
-export default Dashboard;
+export default Dashboard; 
