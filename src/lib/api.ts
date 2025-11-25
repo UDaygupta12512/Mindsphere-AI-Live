@@ -1,5 +1,6 @@
 // API client configuration
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+// Use relative URL for production (Vercel), absolute URL for local development
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? '' : 'http://localhost:4000');
 const TOKEN_KEY = 'ms_token';
 
 // Get stored token
