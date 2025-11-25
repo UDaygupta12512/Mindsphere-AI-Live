@@ -1,6 +1,5 @@
 {
   "name": "mindsphere-server",
-,
   "version": "1.0.0",
   "type": "module",
   "description": "MindSphere AI Backend Server",
