@@ -128,4 +128,23 @@ router.post('/login', async (req, res) => {
   }
 });
 
+
+// GET /api/auth/me - Get current user profile
+import { authMiddleware } from '../middleware/auth.js';
+router.get('/me', authMiddleware, async (req, res) => {
+  try {
+    // req.user is set by authMiddleware
+    const user = req.user;
+    res.json({
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      subscription: user.subscription,
+      createdAt: user.createdAt
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch user profile' });
+  }
+});
+
 export default router;
