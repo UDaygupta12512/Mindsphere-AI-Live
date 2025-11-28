@@ -136,9 +136,7 @@ The Analytics Dashboard provides seven distinct analytics categories:
 - **Activity Tracking**: Daily and weekly learning patterns
 - **Achievement System**: Gamified learning milestones
 - **Learning Statistics**: Time-based and topic-based analysis
-
 - **Server-side streaks**: Computes current and longest consecutive-day streaks from recent activity.
-
 - **PDF report export**: Downloadable student analytics PDF (overview, progress bars, quiz summary).
 
 ### 3. **Catalog Management**
