@@ -7,9 +7,10 @@ interface QuizComponentProps {
   quizzes: Quiz[];
   onComplete: (score: number) => void;
   courseId?: string;
+  onQuizzesUpdated?: (quizzes: Quiz[]) => void;
 }
 
-const QuizComponent: React.FC<QuizComponentProps> = ({ quizzes, onComplete, courseId }) => {
+const QuizComponent: React.FC<QuizComponentProps> = ({ quizzes, onComplete, courseId, onQuizzesUpdated }) => {
   const [currentQuizIndex] = useState(0);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<string>('');
@@ -24,30 +25,7 @@ const QuizComponent: React.FC<QuizComponentProps> = ({ quizzes, onComplete, cour
   // Helper function to get the correct answer letter
   const getCorrectAnswerLetter = (): string => {
     if (!currentQuestion) return '';
-    const correctAns = currentQuestion.correctAnswer;
-    
-    // If it's already just a letter, return it
-    if (/^[A-D]$/.test(correctAns)) {
-      return correctAns;
-    }
-    
-    // If it's "A. text", extract the letter
-    const match = correctAns.match(/^([A-D])\./);
-    if (match) {
-      return match[1];
-    }
-    
-    // If it's full text, try to find which option it matches
-    if (currentQuestion.options) {
-      for (let i = 0; i < currentQuestion.options.length; i++) {
-        const option = currentQuestion.options[i];
-        if (option === correctAns || option.replace(/^[A-D]\.\s*/, '') === correctAns) {
-          return String.fromCharCode(65 + i); // 65 is 'A' in ASCII
-        }
-      }
-    }
-    
-    return '';
+    return extractLetter(currentQuestion.correctAnswer, currentQuestion.options);
   };
 
   if (!quizzes || quizzes.length === 0 || !currentQuiz) {
@@ -70,6 +48,22 @@ const QuizComponent: React.FC<QuizComponentProps> = ({ quizzes, onComplete, cour
     );
   }
 
+  // Shared helper to extract the letter (A-D) from an answer string
+  const extractLetter = (answer: string | undefined, options?: string[]): string => {
+    if (!answer) return '';
+    if (/^[A-D]$/.test(answer)) return answer;
+    const match = answer.match(/^([A-D])\./);
+    if (match) return match[1];
+    if (options) {
+      for (let j = 0; j < options.length; j++) {
+        if (options[j] === answer || options[j].replace(/^[A-D]\.\s*/, '') === answer) {
+          return String.fromCharCode(65 + j);
+        }
+      }
+    }
+    return '';
+  };
+
   const handleAnswerSelect = (answer: string) => {
     setSelectedAnswer(answer);
   };
@@ -77,47 +71,32 @@ const QuizComponent: React.FC<QuizComponentProps> = ({ quizzes, onComplete, cour
   const handleNext = () => {
     if (selectedAnswer) {
       const questionId = `${currentQuizIndex}-${currentQuestionIndex}`;
-      setAnswers({ ...answers, [questionId]: selectedAnswer });
+      setAnswers(prev => ({ ...prev, [questionId]: selectedAnswer }));
       setShowResult(true);
     }
   };
 
   const handleContinue = () => {
+    // Store current answer before moving on (ensures last question is counted)
+    const questionId = `${currentQuizIndex}-${currentQuestionIndex}`;
+    const updatedAnswers = { ...answers, [questionId]: selectedAnswer };
+    setAnswers(updatedAnswers);
+
     setShowResult(false);
     setSelectedAnswer('');
 
     if (currentQuestionIndex < currentQuiz.questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     } else {
-      // Quiz completed
+      // Quiz completed - calculate score from all stored answers including this one
       const totalQuestions = currentQuiz.questions.length;
-      // Count correct answers from answers object
       let correctAnswers = 0;
       for (let i = 0; i < totalQuestions; i++) {
-        const questionId = `${currentQuizIndex}-${i}`;
-        const userAnswer = answers[questionId];
-        const correctAnswer = currentQuiz.questions[i].correctAnswer;
-        // Use extractLetter to compare answers as in the result screen
-        const extractLetter = (answer, options) => {
-          if (!answer) return '';
-          if (/^[A-D]$/.test(answer)) return answer;
-          const match = answer.match(/^([A-D])\./);
-          if (match) return match[1];
-          if (options) {
-            for (let j = 0; j < options.length; j++) {
-              if (options[j] === answer) return String.fromCharCode(65 + j);
-            }
-          }
-          return '';
-        };
-        const userLetter = extractLetter(userAnswer, currentQuiz.questions[i].options);
-        const correctLetter = extractLetter(correctAnswer, currentQuiz.questions[i].options);
-        if (userLetter === correctLetter && userLetter !== '') correctAnswers++;
-      }
-      // Also check the last question if not already included
-      if (!answers.hasOwnProperty(`${currentQuizIndex}-${currentQuestionIndex}`)) {
-        const userLetter = extractLetter(selectedAnswer, currentQuestion.options);
-        const correctLetter = extractLetter(currentQuestion.correctAnswer, currentQuestion.options);
+        const qId = `${currentQuizIndex}-${i}`;
+        const userAnswer = updatedAnswers[qId];
+        const question = currentQuiz.questions[i];
+        const userLetter = extractLetter(userAnswer, question.options);
+        const correctLetter = extractLetter(question.correctAnswer, question.options);
         if (userLetter === correctLetter && userLetter !== '') correctAnswers++;
       }
       const score = Math.round((correctAnswers / totalQuestions) * 100);
@@ -150,12 +129,20 @@ const QuizComponent: React.FC<QuizComponentProps> = ({ quizzes, onComplete, cour
         { quizIndex: currentQuizIndex, count: 5 }
       );
       
-      if (data.success) {
-        if (quizzes[currentQuizIndex]) {
-          quizzes[currentQuizIndex].questions.push(...data.newQuestions);
+      if (data.success && data.newQuestions) {
+        // Notify parent to refresh quiz data from server
+        if (onQuizzesUpdated) {
+          const updatedQuizzes = [...quizzes];
+          const currentQuiz = updatedQuizzes[currentQuizIndex];
+          if (currentQuiz) {
+            updatedQuizzes[currentQuizIndex] = {
+              ...currentQuiz,
+              questions: [...currentQuiz.questions, ...data.newQuestions]
+            };
+            onQuizzesUpdated(updatedQuizzes);
+          }
         }
         handleRestart();
-        alert(`✅ ${data.newQuestions.length} new questions added! Total: ${data.totalQuestions} questions`);
       } else {
         throw new Error(data.error || 'Failed to generate questions');
       }
@@ -169,25 +156,7 @@ const QuizComponent: React.FC<QuizComponentProps> = ({ quizzes, onComplete, cour
 
   const getSelectedAnswerLetter = (): string => {
     if (!selectedAnswer) return '';
-    
-    if (/^[A-D]$/.test(selectedAnswer)) {
-      return selectedAnswer;
-    }
-    
-    const match = selectedAnswer.match(/^([A-D])\./);
-    if (match) {
-      return match[1];
-    }
-    
-    if (currentQuestion?.options) {
-      for (let i = 0; i < currentQuestion.options.length; i++) {
-        if (currentQuestion.options[i] === selectedAnswer) {
-          return String.fromCharCode(65 + i);
-        }
-      }
-    }
-    
-    return '';
+    return extractLetter(selectedAnswer, currentQuestion?.options);
   };
   const selectedAnswerLetter = getSelectedAnswerLetter();
   const correctAnswerLetter = getCorrectAnswerLetter();
@@ -202,29 +171,7 @@ const QuizComponent: React.FC<QuizComponentProps> = ({ quizzes, onComplete, cour
   if (quizCompleted) {
     const totalQuestions = currentQuiz.questions.length;
     
-    const extractLetter = (answer: string, options?: string[]): string => {
-      if (!answer) return '';
-      
-      if (/^[A-D]$/.test(answer)) {
-        return answer;
-      }
-      
-      const match = answer.match(/^([A-D])\./);
-      if (match) {
-        return match[1];
-      }
-      
-      if (options) {
-        for (let i = 0; i < options.length; i++) {
-          if (options[i] === answer) {
-            return String.fromCharCode(65 + i);
-          }
-        }
-      }
-      
-      return '';
-    };
-    
+    // Count correct from all stored answers
     const correctAnswers = Object.keys(answers).filter(questionId => {
       const questionIndex = parseInt(questionId.split('-')[1]);
       const storedAnswer = answers[questionId];
@@ -235,7 +182,7 @@ const QuizComponent: React.FC<QuizComponentProps> = ({ quizzes, onComplete, cour
       const correctLetter = extractLetter(question.correctAnswer, question.options);
       
       return storedLetter === correctLetter && storedLetter !== '';
-    }).length + (isCorrect ? 1 : 0);
+    }).length;
     
     const score = Math.round((correctAnswers / totalQuestions) * 100);
 

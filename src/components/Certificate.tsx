@@ -1,6 +1,6 @@
 import React from 'react';
 import { Certificate } from '../types/achievement';
-import { Button } from './ui/button';
+import jsPDF from 'jspdf';
 import { Download, Share2, CheckCircle } from 'lucide-react';
 
 interface CertificateProps {
@@ -9,14 +9,54 @@ interface CertificateProps {
 }
 
 export const CertificateViewer: React.FC<CertificateProps> = ({ certificate, onClose }) => {
+  const completionDate = new Date(certificate.completionDate);
+
   const handleDownload = () => {
-    // In a real app, this would generate and download a PDF
-    const link = document.createElement('a');
-    link.href = certificate.certificateUrl;
-    link.download = `Certificate-${certificate.courseTitle.replace(/\s+/g, '-')}.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    if (certificate.certificateUrl) {
+      const link = document.createElement('a');
+      link.href = certificate.certificateUrl;
+      link.download = `Certificate-${certificate.courseTitle.replace(/\s+/g, '-')}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      return;
+    }
+
+    // Fallback: generate a simple certificate PDF on the client.
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+    const width = doc.internal.pageSize.getWidth();
+
+    doc.setDrawColor(99, 102, 241);
+    doc.setLineWidth(4);
+    doc.rect(30, 30, width - 60, 535);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(36);
+    doc.text('Certificate of Completion', width / 2, 140, { align: 'center' });
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(16);
+    doc.text('This is proudly presented to', width / 2, 200, { align: 'center' });
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(32);
+    doc.text(certificate.userName, width / 2, 250, { align: 'center' });
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(16);
+    doc.text('for successfully completing the course', width / 2, 290, { align: 'center' });
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(24);
+    doc.text(certificate.courseTitle, width / 2, 335, { align: 'center' });
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(14);
+    doc.text(`Issued on: ${completionDate.toLocaleDateString()}`, width / 2, 390, { align: 'center' });
+    doc.text(`Verification Code: ${certificate.verificationCode}`, width / 2, 415, { align: 'center' });
+    doc.text(`Issued by ${certificate.issuedBy}`, width / 2, 440, { align: 'center' });
+
+    doc.save(`Certificate-${certificate.courseTitle.replace(/\s+/g, '-')}.pdf`);
   };
 
   const handleShare = async () => {
@@ -24,7 +64,7 @@ export const CertificateViewer: React.FC<CertificateProps> = ({ certificate, onC
       if (navigator.share) {
         await navigator.share({
           title: `My Certificate: ${certificate.courseTitle}`,
-          text: `I completed the course "${certificate.courseTitle}" on ${certificate.completionDate.toLocaleDateString()}!`,
+          text: `I completed the course "${certificate.courseTitle}" on ${completionDate.toLocaleDateString()}!`,
           url: window.location.href,
         });
       } else {
@@ -53,7 +93,7 @@ export const CertificateViewer: React.FC<CertificateProps> = ({ certificate, onC
             </p>
             <h4 className="text-xl font-medium text-gray-800 mt-2">{certificate.courseTitle}</h4>
             <div className="mt-4 text-sm text-gray-500">
-              <p>Issued on: {certificate.completionDate.toLocaleDateString()}</p>
+              <p>Issued on: {completionDate.toLocaleDateString()}</p>
               <p>Verification Code: {certificate.verificationCode}</p>
               <p className="mt-2 text-xs text-gray-400">
                 Issued by {certificate.issuedBy}
@@ -62,27 +102,26 @@ export const CertificateViewer: React.FC<CertificateProps> = ({ certificate, onC
           </div>
           
           <div className="mt-6 flex flex-col sm:flex-row justify-center gap-4">
-            <Button 
+            <button
               onClick={handleDownload}
-              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700"
+              className="flex items-center justify-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700"
             >
               <Download className="w-4 h-4" />
               Download PDF
-            </Button>
-            <Button 
+            </button>
+            <button
               onClick={handleShare}
-              variant="outline"
-              className="flex items-center gap-2"
+              className="flex items-center justify-center gap-2 rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
             >
               <Share2 className="w-4 h-4" />
               Share
-            </Button>
-            <Button 
+            </button>
+            <button
               onClick={onClose}
-              variant="ghost"
+              className="rounded-md px-4 py-2 text-gray-700 hover:bg-gray-100"
             >
               Close
-            </Button>
+            </button>
           </div>
         </div>
       </div>

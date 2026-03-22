@@ -13,15 +13,70 @@ const CourseCreator: React.FC<CourseCreatorProps> = ({ onCourseCreated }) => {
   const [file, setFile] = useState<File | null>(null);
   const [url, setUrl] = useState('');
   const [title, setTitle] = useState('');
+  const [fileError, setFileError] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
+
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
+  const validateAndSetFile = (selectedFile: File) => {
+    setFileError('');
+    if (selectedFile.type !== 'application/pdf') {
+      setFileError('Only PDF files are accepted');
+      return;
+    }
+    if (selectedFile.size > MAX_FILE_SIZE) {
+      setFileError(`File size (${(selectedFile.size / 1024 / 1024).toFixed(1)}MB) exceeds 10MB limit`);
+      return;
+    }
+    setFile(selectedFile);
+    if (!title) {
+      setTitle(selectedFile.name.replace('.pdf', ''));
+    }
+  };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
-    if (selectedFile && selectedFile.type === 'application/pdf') {
-      setFile(selectedFile);
-      if (!title) {
-        setTitle(selectedFile.name.replace('.pdf', ''));
-      }
+    if (selectedFile) {
+      validateAndSetFile(selectedFile);
     }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const droppedFile = e.dataTransfer.files?.[0];
+    if (droppedFile) {
+      validateAndSetFile(droppedFile);
+    }
+  };
+
+  const extractPdfText = async (pdfFile: File): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        // Send the raw text content from the PDF file
+        // The backend will use the title and this text to generate course content
+        const text = reader.result as string;
+        // Extract readable text (skip binary PDF data)
+        const lines = text.split('\n').filter(line => {
+          // Filter out binary/encoded lines
+          return line.length > 0 && line.length < 1000 && /[a-zA-Z]{3,}/.test(line);
+        });
+        resolve(lines.join('\n').substring(0, 8000) || pdfFile.name);
+      };
+      reader.onerror = () => resolve(pdfFile.name);
+      reader.readAsText(pdfFile);
+    });
   };
 
   const handleCreateCourse = async () => {
@@ -32,11 +87,18 @@ const CourseCreator: React.FC<CourseCreatorProps> = ({ onCourseCreated }) => {
     setIsLoading(true);
 
     try {
-      const source = activeTab === 'pdf' ? file?.name || 'PDF Document' : url;
-      // Map activeTab to backend sourceType
-      // For now, treat URL as youtube (can be enhanced later to detect type)
-      const sourceType = activeTab === 'url' ? 'youtube' : 'pdf';
-      
+      let source: string;
+      if (activeTab === 'pdf' && file) {
+        // Extract text content from the PDF to send to the AI
+        const pdfText = await extractPdfText(file);
+        source = pdfText;
+      } else {
+        source = url;
+      }
+      // Detect YouTube URLs vs regular URLs
+      const isYoutubeUrl = activeTab === 'url' && /(?:youtube\.com|youtu\.be)/i.test(url);
+      const sourceType = activeTab === 'pdf' ? 'pdf' : isYoutubeUrl ? 'youtube' : 'text';
+
       // Call backend API to create course
       const createdCourse = await coursesApi.create({
         sourceType,
@@ -50,8 +112,7 @@ const CourseCreator: React.FC<CourseCreatorProps> = ({ onCourseCreated }) => {
         id: createdCourse._id,
         createdAt: new Date(createdCourse.createdAt),
         lastAccessed: createdCourse.lastAccessed ? new Date(createdCourse.lastAccessed) : undefined,
-        source: activeTab === 'url' ? 'youtube' : 'pdf'
-      };
+      } as unknown as Course;
 
       onCourseCreated(newCourse);
     } catch (error) {
@@ -149,7 +210,14 @@ const CourseCreator: React.FC<CourseCreatorProps> = ({ onCourseCreated }) => {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Upload PDF Document
               </label>
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors">
+              <div
+                className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                  isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-blue-400'
+                }`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              >
                 <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                 <div className="mb-4">
                   <label htmlFor="pdf-upload" className="cursor-pointer">
@@ -167,6 +235,9 @@ const CourseCreator: React.FC<CourseCreatorProps> = ({ onCourseCreated }) => {
                   />
                 </div>
                 <p className="text-sm text-gray-500">PDF files only, up to 10MB</p>
+                {fileError && (
+                  <p className="mt-2 text-sm text-red-600 font-medium">{fileError}</p>
+                )}
                 {file && (
                   <div className="mt-4 p-3 bg-blue-50 rounded-lg">
                     <p className="text-sm text-blue-700 font-medium">{file.name}</p>

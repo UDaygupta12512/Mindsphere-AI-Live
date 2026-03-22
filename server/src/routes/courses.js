@@ -79,9 +79,6 @@ router.post('/:courseId/notes/:noteIndex/comprehensive', async (req, res) => {
   }
 });
 
-// All routes require authentication
-router.use(authMiddleware);
-
 // POST /api/courses/:courseId/quizzes/generate - Generate more quiz questions
 router.post('/:courseId/quizzes/generate', async (req, res) => {
   try {
@@ -287,8 +284,8 @@ router.post('/', async (req, res) => {
         category: generatedContent.category || 'General',
         level: generatedContent.level || 'Intermediate',
         duration: '45-60 min',
-        rating: 4.8,
-        studentsEnrolled: Math.floor(Math.random() * 5000) + 1000,
+        rating: 0,
+        studentsEnrolled: 0,
         instructor: 'AI Generated',
         topics: generatedContent.topics || [],
         whatYouLearn: [],

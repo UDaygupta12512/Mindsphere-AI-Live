@@ -30,7 +30,7 @@ const FlashcardsComponent: React.FC<FlashcardsComponentProps> = ({ flashcards, o
   };
 
   const handleReview = (difficulty: 'easy' | 'hard') => {
-    const cardId = currentCard.id;
+    const cardId = currentCard.id || `card-${currentIndex}`;
     setReviewedCards({ ...reviewedCards, [cardId]: difficulty });
     
     if (currentIndex < flashcards.length - 1) {

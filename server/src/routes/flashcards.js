@@ -1,7 +1,11 @@
 import express from 'express';
 import { generateFlashcards } from '../services/geminiService.js';
+import { authMiddleware } from '../middleware/auth.js';
 
 const router = express.Router();
+
+// All routes require authentication
+router.use(authMiddleware);
 
 // Generate dynamic flashcards
 router.post('/generate', async (req, res) => {

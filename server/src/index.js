@@ -13,6 +13,9 @@ import quizRoutes from './routes/quiz.js';
 import flashcardsRoutes from './routes/flashcards.js';
 import lessonsRoutes from './routes/lessons.js';
 import youtubeTestRoutes from './routes/youtubeTest.js';
+import achievementsRoutes from './routes/achievements.js';
+import certificatesRoutes from './routes/certificates.js';
+import pointsRoutes from './routes/points.js';
 
 dotenv.config({ path: '../.env.production' });
 dotenv.config();
@@ -20,14 +23,23 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-app.use(cors({
-  origin: [
-    'https://mind-sphere-nine.vercel.app',
-    'https://mind-sphere-cyan.vercel.app',
-    'http://localhost:5173'
-  ],
-  credentials: true
-}));
+// In development, allow all origins for easier testing
+// Note: credentials:true is incompatible with origin:'*' per CORS spec
+const corsConfig = process.env.NODE_ENV === 'production'
+  ? {
+      origin: [
+        'https://mind-sphere-nine.vercel.app',
+        'https://mind-sphere-cyan.vercel.app',
+        'http://localhost:5173'
+      ],
+      credentials: true
+    }
+  : {
+      origin: true,
+      credentials: true
+    };
+
+app.use(cors(corsConfig));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(morgan('dev'));
@@ -44,6 +56,9 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/quiz', quizRoutes);
 app.use('/api/flashcards', flashcardsRoutes);
 app.use('/api/lessons', lessonsRoutes);
+app.use('/api/achievements', achievementsRoutes);
+app.use('/api/certificates', certificatesRoutes);
+app.use('/api/points', pointsRoutes);
 app.use('/api/test', youtubeTestRoutes);
 
 // Friendly root route for browser visits
@@ -65,6 +80,10 @@ app.use((err, req, res, next) => {
 
 const startServer = async () => {
   try {
+    if (!process.env.JWT_SECRET) {
+      console.error('❌ JWT_SECRET environment variable is not set. Authentication will fail.');
+      process.exit(1);
+    }
     await connectDB();
     initializeGemini();
 

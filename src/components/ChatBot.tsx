@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { Send, Bot, User, Lightbulb } from 'lucide-react';
 import { ChatMessage } from '../types/course';
 import { chatApi } from '../lib/api';
@@ -52,8 +53,13 @@ const ChatBot: React.FC<ChatBotProps> = () => {
     setIsTyping(true);
     
     try {
-      // Call backend API for AI response
-      const response = await chatApi.sendMessage(messageToSend);
+      // Build conversation history for multi-turn context
+      const history = messages
+        .filter(m => m.id !== '1') // exclude initial greeting
+        .map(m => ({ role: m.type as 'user' | 'ai', content: m.content }));
+
+      // Call backend API for AI response with conversation history
+      const response = await chatApi.sendMessage(messageToSend, history);
       
       const aiResponse: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -79,6 +85,48 @@ const ChatBot: React.FC<ChatBotProps> = () => {
 
   const handleSuggestedQuestion = (question: string) => {
     setInputMessage(question);
+    // Auto-send the suggested question
+    const userMessage: ChatMessage = {
+      id: Date.now().toString(),
+      type: 'user',
+      content: question,
+      timestamp: new Date()
+    };
+
+    setMessages(prev => {
+      const updated = [...prev, userMessage];
+
+      // Build history from the updated messages (not stale closure)
+      const history = updated
+        .filter(m => m.id !== '1')
+        .map(m => ({ role: m.type as 'user' | 'ai', content: m.content }));
+
+      setInputMessage('');
+      setIsTyping(true);
+
+      chatApi.sendMessage(question, history)
+        .then(response => {
+          const aiResponse: ChatMessage = {
+            id: (Date.now() + 1).toString(),
+            type: 'ai',
+            content: response.reply,
+            timestamp: new Date()
+          };
+          setMessages(prev2 => [...prev2, aiResponse]);
+        })
+        .catch(() => {
+          const errorResponse: ChatMessage = {
+            id: (Date.now() + 1).toString(),
+            type: 'ai',
+            content: 'Sorry, I encountered an error processing your message. Please try again.',
+            timestamp: new Date()
+          };
+          setMessages(prev2 => [...prev2, errorResponse]);
+        })
+        .finally(() => setIsTyping(false));
+
+      return updated;
+    });
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -128,7 +176,13 @@ const ChatBot: React.FC<ChatBotProps> = () => {
                       ? 'bg-blue-600 text-white rounded-br-sm'
                       : 'bg-gray-100 text-gray-900 rounded-bl-sm'
                   }`}>
-                    <p className="whitespace-pre-line">{message.content}</p>
+                    {message.type === 'ai' ? (
+                      <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-headings:my-2">
+                        <ReactMarkdown>{message.content}</ReactMarkdown>
+                      </div>
+                    ) : (
+                      <p className="whitespace-pre-line">{message.content}</p>
+                    )}
                     <p className={`text-xs mt-2 opacity-70 ${
                       message.type === 'user' ? 'text-blue-100' : 'text-gray-500'
                     }`}>
@@ -184,7 +238,7 @@ const ChatBot: React.FC<ChatBotProps> = () => {
                 <textarea
                   value={inputMessage}
                   onChange={(e) => setInputMessage(e.target.value)}
-                  onKeyPress={handleKeyPress}
+                  onKeyDown={handleKeyPress}
                   placeholder="Ask me about your courses, study strategies, or any concept you'd like to understand better..."
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none outline-none"
                   rows={2}
@@ -193,6 +247,7 @@ const ChatBot: React.FC<ChatBotProps> = () => {
               <button
                 onClick={handleSendMessage}
                 disabled={!inputMessage.trim() || isTyping}
+                aria-label="Send message"
                 className="flex items-center justify-center p-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
                 <Send className="h-5 w-5" />

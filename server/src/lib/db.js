@@ -2,6 +2,11 @@ import mongoose from 'mongoose';
 
 export const connectDB = async () => {
   try {
+    // Reuse existing connection if already connected
+    if (mongoose.connection.readyState === 1) {
+      return mongoose.connection;
+    }
+
     // Check if MongoDB URI exists
     if (!process.env.MONGODB_URI) {
       throw new Error('MONGODB_URI environment variable is not defined');

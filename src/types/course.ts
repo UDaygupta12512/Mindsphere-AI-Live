@@ -1,8 +1,10 @@
 export interface Course {
   _id: string;
+  id?: string;
   title: string;
   description: string;
-  source: 'youtube' | 'pdf';
+  source?: string;
+  sourceType?: 'youtube' | 'pdf' | 'text' | 'catalog';
   sourceUrl?: string;
   fileName?: string;
   createdAt: Date;
@@ -53,7 +55,7 @@ export interface LessonResource {
 export interface CourseNote {
   id: string;
   title: string;
-  summary?: string;
+  summary?: string | string[];
   details?: string;
   content?: string; // fallback for old notes
   timestamp?: string;
@@ -81,7 +83,7 @@ export interface QuizQuestion {
 }
 
 export interface Flashcard {
-  id: string;
+  id?: string;
   front: string;
   back: string;
   difficulty: 'easy' | 'medium' | 'hard';

@@ -82,17 +82,22 @@ const CourseCatalog: React.FC<CourseCatalogProps> = ({ onCourseSelect, enrolledC
         case 'rating':
           return b.rating - a.rating;
         case 'newest':
-          return 0;
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         default:
           return 0;
       }
     });
 
+  const totalStudents = catalogCourses.reduce((sum, c) => sum + (c.studentsEnrolled || 0), 0);
+  const avgRating = catalogCourses.length > 0 
+    ? (catalogCourses.reduce((sum, c) => sum + (c.rating || 0), 0) / catalogCourses.length).toFixed(1)
+    : '0';
+
   const stats = [
     { label: 'Total Courses', value: catalogCourses.length, icon: BookOpen, color: 'bg-blue-500' },
     { label: 'Categories', value: getCategories().length, icon: Filter, color: 'bg-green-500' },
-    { label: 'Students Learning', value: '75K+', icon: Users, color: 'bg-orange-500' },
-    { label: 'Avg Rating', value: '4.8', icon: Star, color: 'bg-yellow-500' }
+    { label: 'Students Learning', value: totalStudents.toLocaleString(), icon: Users, color: 'bg-orange-500' },
+    { label: 'Avg Rating', value: avgRating, icon: Star, color: 'bg-yellow-500' }
   ];
 
   if (loading) {
@@ -151,6 +156,7 @@ const CourseCatalog: React.FC<CourseCatalogProps> = ({ onCourseSelect, enrolledC
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
+                aria-label="Filter by category"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 {categories.map(category => (
@@ -163,6 +169,7 @@ const CourseCatalog: React.FC<CourseCatalogProps> = ({ onCourseSelect, enrolledC
               <select
                 value={selectedLevel}
                 onChange={(e) => setSelectedLevel(e.target.value)}
+                aria-label="Filter by level"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 {levels.map(level => (
@@ -181,6 +188,7 @@ const CourseCatalog: React.FC<CourseCatalogProps> = ({ onCourseSelect, enrolledC
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
+                aria-label="Sort courses"
                 className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="popular">Most Popular</option>
@@ -206,6 +214,9 @@ const CourseCatalog: React.FC<CourseCatalogProps> = ({ onCourseSelect, enrolledC
                     src={course.thumbnail}
                     alt={course.title}
                     className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=400&h=250&fit=crop';
+                    }}
                   />
                   {isEnrolled && (
                     <div className="absolute top-3 right-3 bg-green-500 text-white px-3 py-1 rounded-full text-xs font-semibold">
@@ -256,6 +267,10 @@ const CourseCatalog: React.FC<CourseCatalogProps> = ({ onCourseSelect, enrolledC
                       <p className="text-sm font-semibold text-gray-900">{course.instructor}</p>
                     </div>
                     <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onCourseSelect(course);
+                      }}
                       className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all ${
                         isEnrolled
                           ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'

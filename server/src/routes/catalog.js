@@ -183,6 +183,20 @@ router.get('/', (req, res) => {
   }
 });
 
+// GET /api/catalog/:id - Get a single catalog course by ID
+router.get('/:id', (req, res) => {
+  try {
+    const course = catalogCourses.find(c => c.id === req.params.id);
+    if (!course) {
+      return res.status(404).json({ error: 'Catalog course not found' });
+    }
+    res.json(course);
+  } catch (error) {
+    console.error('Get catalog course error:', error);
+    res.status(500).json({ error: 'Failed to fetch catalog course' });
+  }
+});
+
 // POST /api/catalog/:id/enroll - Enroll in catalog course
 router.post('/:id/enroll', authMiddleware, async (req, res) => {
   try {
@@ -309,7 +323,7 @@ router.post('/:id/enroll', authMiddleware, async (req, res) => {
       totalLessons: generatedContent.lessons?.length || 0,
       completedLessons: 0,
       progress: 0,
-      certificate: catalogCourse.certificate || true,
+      certificate: catalogCourse.certificate ?? true,
       user: req.userId,
       lastAccessed: new Date()
     };

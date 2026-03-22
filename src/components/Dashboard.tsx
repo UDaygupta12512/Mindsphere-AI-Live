@@ -11,9 +11,26 @@ interface DashboardProps {
 const Dashboard: React.FC<DashboardProps> = ({ courses, onSelectCourse, onCreateCourse }) => {
   const totalCourses = courses.length;
   const completedCourses = courses.filter(c => c.progress === 100).length;
-  const totalHours = courses.reduce((acc, course) => {
-    const minutes = parseInt(course.duration.split(' ')[0]);
-    return acc + minutes;
+  
+  // Robust duration parsing that handles various formats
+  const parseDurationMinutes = (duration: string): number => {
+    if (!duration) return 0;
+    // Handle "Xh Ym" or "X hours Y minutes" formats
+    const hourMatch = duration.match(/(\d+)\s*h/i);
+    const minMatch = duration.match(/(\d+)\s*m/i);
+    let total = 0;
+    if (hourMatch) total += parseInt(hourMatch[1]) * 60;
+    if (minMatch) total += parseInt(minMatch[1]);
+    // Handle plain number (assumed minutes)
+    if (!hourMatch && !minMatch) {
+      const num = parseInt(duration);
+      if (!isNaN(num)) total = num;
+    }
+    return total;
+  };
+  
+  const totalMinutes = courses.reduce((acc, course) => {
+    return acc + parseDurationMinutes(course.duration);
   }, 0);
 
   const stats = [
@@ -31,7 +48,7 @@ const Dashboard: React.FC<DashboardProps> = ({ courses, onSelectCourse, onCreate
     },
     {
       label: 'Learning Hours',
-      value: `${Math.floor(totalHours / 60)}h`,
+      value: `${Math.floor(totalMinutes / 60)}h`,
       icon: <Clock className="h-6 w-6" />,
       color: 'bg-purple-500'
     },
@@ -75,9 +92,9 @@ const Dashboard: React.FC<DashboardProps> = ({ courses, onSelectCourse, onCreate
             {courses.length > 0 ? (
               <div className="space-y-4">
                 {courses.slice(0, 3).map((course) => (
-                  <div key={course.id} className="flex items-center space-x-4 p-4 hover:bg-gray-50 rounded-lg transition-colors">
-                    <div className={`p-2 rounded-lg ${course.source === 'youtube' ? 'bg-red-100' : 'bg-blue-100'}`}>
-                      {course.source === 'youtube' ? (
+                    <div key={course._id || course.id} className="flex items-center space-x-4 p-4 hover:bg-gray-50 rounded-lg transition-colors">
+                    <div className={`p-2 rounded-lg ${course.sourceType === 'youtube' ? 'bg-red-100' : 'bg-blue-100'}`}>
+                      {course.sourceType === 'youtube' ? (
                         <Play className="h-5 w-5 text-red-600" />
                       ) : (
                         <FileText className="h-5 w-5 text-blue-600" />
@@ -85,7 +102,7 @@ const Dashboard: React.FC<DashboardProps> = ({ courses, onSelectCourse, onCreate
                     </div>
                     <div className="flex-1">
                       <h3 className="font-semibold text-gray-900">{course.title}</h3>
-                      <p className="text-sm text-gray-600">Created {course.createdAt.toLocaleDateString()}</p>
+                      <p className="text-sm text-gray-600">Created {new Date(course.createdAt).toLocaleDateString()}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-medium text-gray-900">{course.progress}% Complete</p>
@@ -123,14 +140,14 @@ const Dashboard: React.FC<DashboardProps> = ({ courses, onSelectCourse, onCreate
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {courses.map((course) => (
                 <div
-                  key={course.id}
+                  key={course._id || course.id}
                   className="bg-white rounded-2xl shadow-lg border border-gray-100 hover:shadow-xl transition-all cursor-pointer transform hover:scale-105"
                   onClick={() => onSelectCourse(course)}
                 >
                   <div className="p-6">
                     <div className="flex items-center justify-between mb-4">
-                      <div className={`p-2 rounded-lg ${course.source === 'youtube' ? 'bg-red-100' : 'bg-blue-100'}`}>
-                        {course.source === 'youtube' ? (
+                      <div className={`p-2 rounded-lg ${course.sourceType === 'youtube' ? 'bg-red-100' : 'bg-blue-100'}`}>
+                        {course.sourceType === 'youtube' ? (
                           <Play className="h-6 w-6 text-red-600" />
                         ) : (
                           <FileText className="h-6 w-6 text-blue-600" />
@@ -149,15 +166,11 @@ const Dashboard: React.FC<DashboardProps> = ({ courses, onSelectCourse, onCreate
                     <div className="flex items-center space-x-4 mb-4 text-sm text-gray-500">
                       <div className="flex items-center space-x-1">
                         <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
-                        <span>{course.totalLessons || course.lessons?.length || 8} lessons</span>
+                        <span>{course.totalLessons || course.lessons?.length || 0} lessons</span>
                       </div>
                       <div className="flex items-center space-x-1">
                         <span className="w-2 h-2 bg-green-500 rounded-full"></span>
                         <span>{course.level || 'Intermediate'}</span>
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
-                        <span>{course.rating || 4.8}★</span>
                       </div>
                     </div>
                     

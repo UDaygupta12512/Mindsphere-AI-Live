@@ -5,18 +5,6 @@ import { TrendingUp, Clock, BookOpen, Zap, Award, Flame, Activity, Target } from
 import { api } from '../lib/api';
 import { AnalyticsDashboardData } from '../types/analytics';
 
-// Helper to load image from URL as base64
-async function getImageBase64FromUrl(url: string): Promise<string> {
-  const response = await fetch(url);
-  const blob = await response.blob();
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-}
-
 // Generate a highly visualized PDF report
 async function handleDownloadReport(analytics: AnalyticsDashboardData | null) {
 
@@ -279,7 +267,7 @@ async function handleDownloadReport(analytics: AnalyticsDashboardData | null) {
   doc.save('learning-analytics-report.pdf');
 }
 
-const AnalyticsDashboard: React.FC = () => {
+const AnalyticsDashboard: React.FC<{ onNavigate?: (view: string) => void }> = ({ onNavigate }) => {
   const [analytics, setAnalytics] = useState<AnalyticsDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -292,19 +280,28 @@ const AnalyticsDashboard: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      console.log('Fetching analytics from /api/analytics...');
-      const data = await api.get<AnalyticsDashboardData>('/api/analytics');
-      console.log('Analytics data received:', data);
-
-      // Check if data has the expected structure
-      if (data && typeof data === 'object' && 'data' in data) {
-        setAnalytics((data as any).data);
-      } else if (data && 'overview' in data) {
-        setAnalytics(data);
+      const rawData = await api.get<any>('/api/analytics');
+      
+      // Backend returns {success: true, data: {...}} - extract the analytics data
+      let analyticsData: AnalyticsDashboardData;
+      if (rawData && rawData.data && rawData.data.overview) {
+        analyticsData = rawData.data;
+      } else if (rawData && rawData.overview) {
+        analyticsData = rawData;
       } else {
-        console.warn('Unexpected data structure:', data);
         setError('Unexpected response format from server');
+        return;
       }
+
+      // Ensure all required fields have safe defaults
+      analyticsData.overview = analyticsData.overview || {} as any;
+      analyticsData.courseProgress = analyticsData.courseProgress || [];
+      analyticsData.dailyActivity = analyticsData.dailyActivity || [];
+      analyticsData.weeklyStats = analyticsData.weeklyStats || [];
+      analyticsData.achievements = analyticsData.achievements || [];
+      analyticsData.learningStats = analyticsData.learningStats || {} as any;
+      
+      setAnalytics(analyticsData);
     } catch (err) {
       console.error('Error fetching analytics:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to load analytics data';
@@ -365,17 +362,30 @@ const AnalyticsDashboard: React.FC = () => {
     fullName: c.courseTitle
   }));
 
-  const StatCard = ({ icon: Icon, label, value, unit = '', color = 'blue' }: any) => (
-    <div className={`bg-gradient-to-br from-${color}-50 to-${color}-100 rounded-lg p-6 border border-${color}-200`}>
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-gray-600 text-sm font-medium">{label}</p>
-          <p className="text-3xl font-bold text-gray-900 mt-2">{value}{unit}</p>
+  const colorMap: Record<string, { bg: string; border: string; text: string }> = {
+    blue: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-600' },
+    purple: { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-600' },
+    yellow: { bg: 'bg-yellow-50', border: 'border-yellow-200', text: 'text-yellow-600' },
+    green: { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-600' },
+    red: { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-600' },
+    indigo: { bg: 'bg-indigo-50', border: 'border-indigo-200', text: 'text-indigo-600' },
+    cyan: { bg: 'bg-cyan-50', border: 'border-cyan-200', text: 'text-cyan-600' },
+  };
+
+  const StatCard = ({ icon: Icon, label, value, unit = '', color = 'blue' }: any) => {
+    const c = colorMap[color] || colorMap.blue;
+    return (
+      <div className={`${c.bg} rounded-lg p-6 border ${c.border}`}>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-gray-600 text-sm font-medium">{label}</p>
+            <p className="text-3xl font-bold text-gray-900 mt-2">{value}{unit}</p>
+          </div>
+          <Icon className={`h-10 w-10 ${c.text} opacity-80`} />
         </div>
-        <Icon className={`h-10 w-10 text-${color}-600 opacity-80`} />
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 py-12 px-4">
@@ -644,11 +654,17 @@ const AnalyticsDashboard: React.FC = () => {
           <h2 className="text-3xl font-bold mb-3">Keep Up the Great Work! 🎉</h2>
           <p className="text-blue-100 mb-6">You're making excellent progress. Keep learning and achieve your goals!</p>
           <div className="flex gap-4 justify-center flex-wrap">
-            <button className="bg-white text-blue-600 px-6 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-colors">
+            <button
+              onClick={() => onNavigate?.('dashboard')}
+              className="bg-white text-blue-600 px-6 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-colors"
+            >
               Continue Learning
             </button>
-            <button className="bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-800 transition-colors border border-blue-500">
-              View Certificates
+            <button
+              onClick={() => onNavigate?.('catalog')}
+              className="bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-800 transition-colors border border-blue-500"
+            >
+              Browse Courses
             </button>
           </div>
         </div>

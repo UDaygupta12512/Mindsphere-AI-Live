@@ -81,7 +81,8 @@ const CourseViewer: React.FC<CourseViewerProps> = ({ course, onBack, onUpdateCou
     updatedLessons[lessonIndex] = { ...updatedLessons[lessonIndex], isCompleted: true };
     
     const completedCount = updatedLessons.filter(l => l.isCompleted).length;
-    const progressPercentage = Math.round((completedCount / course.totalLessons) * 100);
+    const totalLessons = course.totalLessons || course.lessons.length || 1;
+    const progressPercentage = Math.round((completedCount / totalLessons) * 100);
     
     const updatedCourse = {
       ...course,
@@ -118,8 +119,6 @@ const CourseViewer: React.FC<CourseViewerProps> = ({ course, onBack, onUpdateCou
     }
   };
 
-  console.log('Debugging course.duration:', course.duration);
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -154,11 +153,11 @@ const CourseViewer: React.FC<CourseViewerProps> = ({ course, onBack, onUpdateCou
                   </div>
                   <div className="flex items-center space-x-1">
                     <Users className="h-4 w-4" />
-                    <span>{course.studentsEnrolled || 1247} students</span>
+                    <span>{course.studentsEnrolled || 0} students</span>
                   </div>
                   <div className="flex items-center space-x-1">
                     <Star className="h-4 w-4 text-yellow-500" />
-                    <span>{course.rating || 4.8} ({Math.floor(Math.random() * 500) + 100} reviews)</span>
+                    <span>{course.rating || 0} rating</span>
                   </div>
                   <div className="flex items-center space-x-1">
                     <Play className="h-4 w-4" />
@@ -251,9 +250,17 @@ const CourseViewer: React.FC<CourseViewerProps> = ({ course, onBack, onUpdateCou
                 </div>
               )}
 
-              {activeTab === 'notes' && (
+              {activeTab === 'notes' && course.notes && (
                 <div className="space-y-2">
                   <h4 className="text-sm font-medium text-gray-600 mb-2">Sections</h4>
+                  {course.notes.map((note, index) => (
+                    <div
+                      key={note.title + index}
+                      className="w-full text-left px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50 border border-gray-200"
+                    >
+                      <span className="font-medium">{note.title}</span>
+                    </div>
+                  ))}
                 </div>
               )}
 
@@ -295,11 +302,11 @@ const CourseViewer: React.FC<CourseViewerProps> = ({ course, onBack, onUpdateCou
                       <div className="text-sm text-gray-600">Completed</div>
                     </div>
                     <div className="text-center p-4 bg-purple-50 rounded-lg">
-                      <div className="text-2xl font-bold text-purple-600">{course.quizzes.length}</div>
+                      <div className="text-2xl font-bold text-purple-600">{course.quizzes?.length || 0}</div>
                       <div className="text-sm text-gray-600">Quizzes</div>
                     </div>
                     <div className="text-center p-4 bg-orange-50 rounded-lg">
-                      <div className="text-2xl font-bold text-orange-600">{course.flashcards.length}</div>
+                      <div className="text-2xl font-bold text-orange-600">{course.flashcards?.length || 0}</div>
                       <div className="text-sm text-gray-600">Flashcards</div>
                     </div>
                   </div>
@@ -526,6 +533,9 @@ const CourseViewer: React.FC<CourseViewerProps> = ({ course, onBack, onUpdateCou
                     quizzes={course.quizzes}
                     courseId={course._id}
                     onComplete={handleQuizComplete}
+                    onQuizzesUpdated={(updatedQuizzes) => {
+                      onUpdateCourse({ ...course, quizzes: updatedQuizzes });
+                    }}
                   />
                 </div>
               )}

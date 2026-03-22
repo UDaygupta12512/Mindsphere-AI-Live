@@ -1,7 +1,11 @@
 import express from 'express';
 import { generateQuizQuestions } from '../services/geminiService.js';
+import { authMiddleware } from '../middleware/auth.js';
 
 const router = express.Router();
+
+// All routes require authentication
+router.use(authMiddleware);
 
 // Generate dynamic quiz questions
 router.post('/generate', async (req, res) => {

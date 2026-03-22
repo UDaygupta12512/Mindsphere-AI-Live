@@ -11,7 +11,7 @@ router.use(authMiddleware);
 // POST /api/chat - Send message and get AI response
 router.post('/', async (req, res) => {
   try {
-    const { message } = req.body;
+    const { message, history } = req.body;
     
     if (!message || !message.trim()) {
       return res.status(400).json({ 
@@ -30,8 +30,8 @@ router.post('/', async (req, res) => {
       topics: course.topics
     }));
     
-    // Generate AI response
-    const reply = await generateChatResponse(message, coursesContext);
+    // Generate AI response with conversation history
+    const reply = await generateChatResponse(message, coursesContext, history || []);
     
     res.json({ reply });
   } catch (error) {

@@ -1,6 +1,7 @@
 import { Course } from '../types/course';
 
-export interface CatalogCourse extends Omit<Course, 'createdAt' | 'lastAccessed'> {
+export interface CatalogCourse extends Omit<Course, 'createdAt' | 'lastAccessed' | '_id'> {
+  id: string;
   whatYouLearn: string[];
   requirements: string[];
   isEnrolled?: boolean;
@@ -260,4 +261,3 @@ export const getCategories = (): string[] => {
   const categories = new Set(catalogCourses.map(course => course.category));
   return Array.from(categories);
 };
- 

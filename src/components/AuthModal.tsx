@@ -1,4 +1,5 @@
 import React, { useState } from 'react'; 
+import { X } from 'lucide-react';
 import { authApi, setToken } from '../lib/api';
 
 interface AuthModalProps {
@@ -80,9 +81,8 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onAuth }) => {
       onClose();
     } catch (error) {
       console.error('Auth error:', error);
-      setErrors({
-        email: error instanceof Error ? error.message : 'Authentication failed. Please try again.'
-      });
+      const errorMsg = error instanceof Error ? error.message : 'Authentication failed. Please try again.';
+      setErrors({ general: errorMsg });
     } finally {
       setIsLoading(false);
     }
@@ -105,6 +105,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onAuth }) => {
             onClick={onClose}
             className="absolute top-4 right-4 p-2 hover:bg-white/20 rounded-lg transition-colors"
           >
+            <X className="h-5 w-5 text-white" />
             <span className="sr-only">Close</span>
           </button>
           <h2 className="text-2xl font-bold">
@@ -114,6 +115,11 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onAuth }) => {
 
         {/* Form */}
         <div className="p-6">
+          {errors.general && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-red-600 text-sm">{errors.general}</p>
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="space-y-4">
             {isSignUp && (
               <div>
@@ -192,7 +198,11 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onAuth }) => {
             <p className="text-sm">
               {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
               <button
-                onClick={() => setIsSignUp(!isSignUp)}
+                onClick={() => {
+                  setIsSignUp(!isSignUp);
+                  setFormData({ name: '', email: '', password: '', confirmPassword: '' });
+                  setErrors({});
+                }}
                 className="text-blue-600 hover:underline"
               >
                 {isSignUp ? 'Login' : 'Sign Up'}

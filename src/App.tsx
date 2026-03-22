@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'; 
+import { useState, useEffect } from 'react';
 import Header from './components/Header';
 import Hero from './components/Hero';
 import Dashboard from './components/Dashboard';
@@ -9,10 +9,16 @@ import AuthModal from './components/AuthModal';
 import CourseCatalog from './components/CourseCatalog';
 import CourseDetail from './components/CourseDetail';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
+import Features from './components/Features';
+import HowItWorks from './components/HowItWorks';
+import CTASection from './components/CTASection';
+import AITutorSection from './components/AITutorSection';
+import StudyTools from './components/StudyTools';
+import Footer from './components/Footer';
 import { Course } from './types/course';
 import { User } from './types/auth';
 import { CatalogCourse } from './utils/catalogData';
-import { coursesApi, catalogApi, getToken, removeToken } from './lib/api';
+import { coursesApi, catalogApi, api, getToken, removeToken } from './lib/api';
 
 function App() {
   const [currentView, setCurrentView] = useState('home');
@@ -23,86 +29,50 @@ function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
-  // Load courses from backend if token exists
+  // Initialize auth and load user data on app start
   useEffect(() => {
-    const loadUserCourses = async () => {
+    const initializeApp = async () => {
       const token = getToken();
-      if (token) {
-        try {
-          const userCourses = await coursesApi.getAll();
-          setCourses(userCourses.map(course => ({
-            ...course,
-            id: course._id,
-            createdAt: new Date(course.createdAt),
-            lastAccessed: course.lastAccessed ? new Date(course.lastAccessed) : undefined
-          } as unknown as Course)));
-          
-          // Get all catalog courses to map titles back to IDs
-          const catalogData = await catalogApi.getAll();
-          
-          // Extract enrolled course titles from catalog courses
-          const enrolledTitles = userCourses
-            .filter(c => c.sourceType === 'catalog')
-            .map(c => c.title);
-          
-          // Map titles to catalog IDs
-          const catalogIds = catalogData
-            .filter(cat => enrolledTitles.includes(cat.title))
-            .map(cat => (cat as { id?: string }).id)
-            .filter((id): id is string => id !== undefined);
-          
-          setEnrolledCourseIds(catalogIds);
-          
-          // Set user data (reconstruct from token presence)
-          // In a real app, you'd fetch user profile from backend
-          const savedUser = localStorage.getItem('edusynth-user');
-          if (savedUser) {
-            const parsedUser = JSON.parse(savedUser);
-            setUser({
-              ...parsedUser,
-              createdAt: new Date(parsedUser.createdAt)
-            });
-          }
-        } catch (error) {
-          console.error('Error loading courses:', error);
-          // Clear invalid token
-          removeToken();
-        }
-      }
-    };
-    
-    loadUserCourses();
-  }, []);
+      if (!token) return;
 
-  // Validate token and initialize user on app start
-  useEffect(() => {
-    const initializeAuth = async () => {
-      const token = getToken();
-      console.log('Retrieved token:', token); // Debug log for token retrieval
+      try {
+        // Validate token by fetching user data via API helper (uses correct base URL)
+        const userData = await api.get<User>('/api/auth/me');
+        setUser(userData);
 
-      if (token) {
-        try {
-          // Validate token by fetching user data
-          const userData = await (await fetch('/api/auth/me', {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            }
-          })).json();
-          console.log('User data fetched successfully:', userData); // Debug log for API response
-          
-          setUser(userData);
-        } catch (error) {
-          console.error('Token validation failed:', error);
-          removeToken();
-        }
-      } else {
-        console.log('No token found in localStorage.');
+        // Load user's courses
+        const userCourses = await coursesApi.getAll();
+        setCourses(userCourses.map(course => ({
+          ...course,
+          id: course._id,
+          createdAt: new Date(course.createdAt),
+          lastAccessed: course.lastAccessed ? new Date(course.lastAccessed) : undefined
+        } as unknown as Course)));
+
+        // Get all catalog courses to map titles back to IDs
+        const catalogData = await catalogApi.getAll();
+
+        // Extract enrolled course titles from catalog courses
+        const enrolledTitles = userCourses
+          .filter(c => c.sourceType === 'catalog')
+          .map(c => c.title);
+
+        // Map titles to catalog IDs
+        const catalogIds = catalogData
+          .filter(cat => enrolledTitles.includes(cat.title))
+          .map(cat => (cat as { id?: string }).id)
+          .filter((id): id is string => id !== undefined);
+
+        setEnrolledCourseIds(catalogIds);
+      } catch (error) {
+        console.error('Error initializing app:', error);
+        // Clear invalid token
+        removeToken();
+        localStorage.removeItem('edusynth-user');
       }
     };
 
-    initializeAuth();
+    initializeApp();
   }, []);
 
   // Save user to localStorage whenever user changes
@@ -116,7 +86,7 @@ function App() {
 
   const handleNavigate = (view: string) => {
     // Require authentication for certain views
-    if (!user && ['dashboard', 'create', 'chatbot'].includes(view)) {
+    if (!user && ['dashboard', 'create', 'chatbot', 'analytics'].includes(view)) {
       setIsAuthModalOpen(true);
       return;
     }
@@ -136,7 +106,7 @@ function App() {
   const handleAuth = async (userData: User) => {
     setUser(userData);
     setCurrentView('dashboard');
-    
+
     // Fetch user's courses after authentication
     try {
       const userCourses = await coursesApi.getAll();
@@ -146,21 +116,21 @@ function App() {
         createdAt: new Date(course.createdAt),
         lastAccessed: course.lastAccessed ? new Date(course.lastAccessed) : undefined
       } as unknown as Course)));
-      
+
       // Get all catalog courses to map titles back to IDs
       const catalogData = await catalogApi.getAll();
-      
+
       // Extract enrolled course titles
       const enrolledTitles = userCourses
         .filter(c => c.sourceType === 'catalog')
         .map(c => c.title);
-      
+
       // Map titles to catalog IDs
       const catalogIds = catalogData
         .filter(cat => enrolledTitles.includes(cat.title))
         .map(cat => (cat as { id?: string }).id)
         .filter((id): id is string => id !== undefined);
-      
+
       setEnrolledCourseIds(catalogIds);
     } catch (error) {
       console.error('Error loading courses after auth:', error);
@@ -187,8 +157,8 @@ function App() {
   };
 
   const handleUpdateCourse = (updatedCourse: Course) => {
-    setCourses(prev => prev.map(course => 
-      course.id === updatedCourse.id ? updatedCourse : course
+    setCourses(prev => prev.map(course =>
+      (course._id || course.id) === (updatedCourse._id || updatedCourse.id) ? updatedCourse : course
     ));
     setSelectedCourse(updatedCourse);
   };
@@ -216,7 +186,7 @@ function App() {
 
     try {
       const enrolledCourse = await catalogApi.enroll(catalogCourse.id);
-      
+
       const courseWithId: Course = {
         ...enrolledCourse,
         id: enrolledCourse._id,
@@ -245,7 +215,17 @@ function App() {
   const renderCurrentView = () => {
     switch (currentView) {
       case 'home':
-        return <Hero onGetStarted={handleGetStarted} />;
+        return (
+          <>
+            <Hero onGetStarted={handleGetStarted} />
+            <Features />
+            <AITutorSection />
+            <StudyTools />
+            <HowItWorks />
+            <CTASection onGetStarted={handleGetStarted} />
+            <Footer />
+          </>
+        );
       case 'catalog':
         return (
           <CourseCatalog
@@ -295,7 +275,7 @@ function App() {
       case 'chatbot':
         return <ChatBot courses={courses} />;
       case 'analytics':
-        return <AnalyticsDashboard />;
+        return <AnalyticsDashboard onNavigate={handleNavigate} />;
       default:
         return <Hero onGetStarted={handleGetStarted} />;
     }
@@ -303,8 +283,8 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header 
-        onNavigate={handleNavigate} 
+      <Header
+        onNavigate={handleNavigate}
         currentView={currentView}
         user={user}
         onAuthClick={() => setIsAuthModalOpen(true)}
@@ -313,7 +293,7 @@ function App() {
       <main>
         {renderCurrentView()}
       </main>
-      
+
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}

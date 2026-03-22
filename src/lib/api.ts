@@ -1,11 +1,3 @@
-// Chat API
-export const chatApi = {
-  sendMessage: (message: string) => {
-    // You may want to adjust the endpoint and payload as per your backend
-    return api.post<{ reply: string }>('/api/chat', { message });
-  },
-};
-
 // API client configuration
 // Use relative URL for production (Vercel), absolute URL for local development
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? '' : 'http://localhost:4000');
@@ -15,11 +7,6 @@ const TOKEN_KEY = 'ms_token';
 export const getToken = (): string | null => {
   return localStorage.getItem(TOKEN_KEY);
 };
-
-// ...existing code...
-
-// API methods
-
 
 // Set token
 export const setToken = (token: string): void => {
@@ -129,17 +116,8 @@ export const api = {
       method: 'POST',
       body: formData,
       headers: {
-        // Let the browser set the Content-Type with the boundary
         'Accept': 'application/json',
       },
-    }, false);
-  },
-
-  // Mark quiz as completed for a course
-  completeQuiz: (courseId: string, quizIndex: number, score: number) => {
-    return api.patch(`/api/courses/${courseId}/quizzes/${quizIndex}/complete`, {
-      score,
-      completedAt: new Date().toISOString(),
     });
   },
 };
@@ -164,7 +142,21 @@ interface CourseResponse {
   [key: string]: unknown; // Allow other properties
 }
 
-import { Achievement, UserPoints, Certificate } from '../types/achievement';
+import {
+  Achievement,
+  AwardPointsResponse,
+  UserPoints,
+  Certificate,
+  PointsCategory,
+} from '../types/achievement';
+
+const normalizeCertificate = (certificate: Certificate): Certificate => {
+  return {
+    ...certificate,
+    completionDate: new Date(certificate.completionDate),
+    expiresAt: certificate.expiresAt ? new Date(certificate.expiresAt) : undefined,
+  };
+};
 
 // Achievement API
 export const achievementApi = {
@@ -184,7 +176,7 @@ export const achievementApi = {
   },
 
   // Award points to user
-  awardPoints: (data: { amount: number; category: 'course_completion' | 'participation' | 'daily_login' | 'other'; reason: string }): Promise<UserPoints> => {
+  awardPoints: (data: { amount: number; category: PointsCategory; reason: string }): Promise<AwardPointsResponse> => {
     return api.post('/api/points/award', data);
   }
 };
@@ -193,22 +185,35 @@ export const achievementApi = {
 export const certificateApi = {
   // Generate a certificate for a completed course
   generate: (courseId: string): Promise<Certificate> => {
-    return api.post(`/api/certificates/generate/${courseId}`);
+    return api.post<Certificate>(`/api/certificates/generate/${courseId}`).then(normalizeCertificate);
   },
 
   // Get all certificates for the current user
   getAll: (): Promise<Certificate[]> => {
-    return api.get('/api/certificates');
+    return api.get<Certificate[]>('/api/certificates').then((certificates) => {
+      return certificates.map(normalizeCertificate);
+    });
   },
 
   // Get a specific certificate by ID
   getById: (certificateId: string): Promise<Certificate> => {
-    return api.get(`/api/certificates/${certificateId}`);
+    return api.get<Certificate>(`/api/certificates/${certificateId}`).then(normalizeCertificate);
   },
 
   // Verify a certificate by its verification code
   verify: (verificationCode: string): Promise<{ valid: boolean; certificate?: Certificate }> => {
-    return api.get(`/api/certificates/verify/${verificationCode}`);
+    return api
+      .get<{ valid: boolean; certificate?: Certificate }>(`/api/certificates/verify/${verificationCode}`)
+      .then((result) => {
+        if (!result.certificate) {
+          return result;
+        }
+
+        return {
+          ...result,
+          certificate: normalizeCertificate(result.certificate),
+        };
+      });
   }
 };
 
@@ -264,31 +269,15 @@ export const catalogApi = {
     return api.get<CourseResponse[]>('/api/catalog');
   },
   
-  getById: (id: string) => {
-    return api.get<CourseResponse>(`/api/catalog/${id}`);
-  },
-  
-  create: (data: { sourceType: string; source?: string; title?: string; catalogCourse?: Record<string, any> }) => {
-    return api.post<CourseResponse>('/api/catalog', data);
-  },
-  
   enroll: (id: string) => {
     return api.post<CourseResponse>(`/api/catalog/${id}/enroll`);
   },
-  
-  updateProgress: (id: string, data: {
-    progress: number;
-    completedLessons?: number;
-    lessons?: any[];
-  }) => {
-    return api.patch(`/api/catalog/${id}`, data);
-  },
-  // Mark quiz as completed for a course (if needed for catalog)
-  completeQuiz: (courseId: string, quizIndex: number, score: number) => {
-    return api.patch(`/api/catalog/${courseId}/quizzes/${quizIndex}/complete`, {
-      score,
-      completedAt: new Date().toISOString(),
-    });
+};
+
+// Chat API - supports conversation history for multi-turn context
+export const chatApi = {
+  sendMessage: (message: string, history: Array<{ role: 'user' | 'ai'; content: string }> = []) => {
+    return api.post<{ reply: string }>('/api/chat', { message, history });
   },
 };
  

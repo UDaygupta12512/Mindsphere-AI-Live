@@ -778,8 +778,8 @@ Return the response as a valid JSON object with this exact structure:
   }
 };
 
-export const generateChatResponse = async (message, coursesContext) => {
-  if (geminiApiKeys.length === 0 && openRouterApiKey) {
+export const generateChatResponse = async (message, coursesContext, history = []) => {
+  if (geminiApiKeys.length === 0 && !openRouterApiKey) {
     throw new Error('AI system is not initialized. Please check your API keys.');
   }
 
@@ -787,7 +787,15 @@ export const generateChatResponse = async (message, coursesContext) => {
     ? `The user is enrolled in these courses:\n${coursesContext.map(c => `- ${c.title}: ${c.summary || 'No summary'}`).join('\n')}`
     : 'The user has not enrolled in any courses yet.';
 
-  const prompt = `You are a concise AI tutor helping a student learn. ${contextInfo}
+  // Build conversation history string for context
+  let conversationContext = '';
+  if (history && history.length > 0) {
+    const recentHistory = history.slice(-10); // Keep last 10 messages for context
+    conversationContext = '\n\nPrevious conversation:\n' + 
+      recentHistory.map(h => `${h.role === 'user' ? 'Student' : 'Tutor'}: ${h.content}`).join('\n');
+  }
+
+  const prompt = `You are a concise AI tutor helping a student learn. ${contextInfo}${conversationContext}
 
 Student's question: ${message}
 
@@ -798,10 +806,22 @@ IMPORTANT: Provide a SHORT, DIRECT answer (2-4 sentences max).
 - Be clear and to the point`;
 
   try {
-    // Use OpenRouter GPT-3.5 for chatbot responses
-    return await makeOpenRouterCall(prompt, 'openai/gpt-3.5-turbo');
+    // Try OpenRouter first, fallback to Gemini
+    if (openRouterApiKey) {
+      return await makeOpenRouterCall(prompt, 'openai/gpt-3.5-turbo');
+    } else {
+      return await makeAICall(prompt);
+    }
   } catch (error) {
     console.error('Error generating chat response:', error);
+    // If OpenRouter failed, try Gemini as fallback
+    if (openRouterApiKey && geminiApiKeys.length > 0) {
+      try {
+        return await makeAICall(prompt);
+      } catch (fallbackError) {
+        console.error('Fallback chat response also failed:', fallbackError);
+      }
+    }
     throw new Error('Failed to generate response. Please try again.');
   }
 };

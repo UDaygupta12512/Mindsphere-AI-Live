@@ -1,3 +1,5 @@
+export type PointsCategory = 'course_completion' | 'participation' | 'daily_login' | 'other';
+
 export interface Achievement {
   id: string;
   title: string;
@@ -24,6 +26,13 @@ export interface UserPoints {
   level: number;
   nextLevelPoints: number;
   currentLevelPoints: number;
+}
+
+export interface AwardPointsResponse extends UserPoints {
+  awarded: number;
+  category: PointsCategory;
+  reason: string;
+  message: string;
 }
 
 export interface Certificate {
