@@ -52,24 +52,24 @@ const StudyTools: React.FC<StudyToolsProps> = ({ onNavigate }) => {
     };
 
     return (
-        <section className="py-24 bg-gray-50">
+        <section className="py-24 bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="text-center mb-16">
                     <div className="inline-block px-4 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold uppercase tracking-wide mb-4">
                         ⚡ Advanced Study Tools
                     </div>
-                    <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+                    <h2 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4">
                         Supercharge Your <br />
                         <span className="text-green-500">Study Sessions</span>
                     </h2>
-                    <p className="text-lg text-gray-600 max-w-3xl mx-auto">
+                    <p className="text-lg text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
                         Access a comprehensive suite of AI-powered study tools designed to optimize your learning experience and help you achieve your academic goals faster than ever before.
                     </p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     {tools.map((tool, index) => (
-                        <div key={index} className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 hover:shadow-xl hover:border-blue-100 transition-all duration-300 group">
+                        <div key={index} className="bg-white dark:bg-gray-800 rounded-3xl p-8 shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-xl hover:border-blue-100 dark:hover:border-blue-900 transition-all duration-300 group">
                             <div className="flex justify-between items-start mb-6">
                                 <div className={`${tool.color} w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg transform group-hover:scale-110 transition-transform`}>
                                     {tool.icon}
@@ -79,12 +79,12 @@ const StudyTools: React.FC<StudyToolsProps> = ({ onNavigate }) => {
                                 </span>
                             </div>
 
-                            <h3 className="text-2xl font-bold text-gray-900 mb-2">{tool.title}</h3>
-                            <p className="text-gray-600 mb-6 h-12">{tool.description}</p>
+                            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{tool.title}</h3>
+                            <p className="text-gray-600 dark:text-gray-300 mb-6 h-12">{tool.description}</p>
 
                             <div className="space-y-3 mb-8">
                                 {tool.features.map((feature, idx) => (
-                                    <div key={idx} className="flex items-center gap-2 text-sm font-medium text-gray-600">
+                                    <div key={idx} className="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-300">
                                         <CheckCircle2 className="w-5 h-5 text-green-500" />
                                         {feature}
                                     </div>
@@ -93,7 +93,7 @@ const StudyTools: React.FC<StudyToolsProps> = ({ onNavigate }) => {
 
                             <button
                                 onClick={() => handleToolClick(tool.action)}
-                                className="w-full py-4 rounded-xl border-2 border-gray-100 font-semibold text-gray-700 flex items-center justify-center gap-2 group-hover:bg-blue-50 group-hover:border-blue-200 group-hover:text-blue-600 transition-all cursor-pointer"
+                                className="w-full py-4 rounded-xl border-2 border-gray-100 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-300 flex items-center justify-center gap-2 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/30 group-hover:border-blue-200 dark:group-hover:border-blue-800 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-all cursor-pointer"
                             >
                                 Explore Tool <ArrowRight className="w-4 h-4 ml-1 transform group-hover:translate-x-1 transition-transform" />
                             </button>

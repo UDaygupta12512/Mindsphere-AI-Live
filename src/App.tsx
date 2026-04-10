@@ -123,7 +123,9 @@ function App() {
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   // Update URL hash when view changes
@@ -419,7 +421,7 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-dark-bg text-gray-900 dark:text-gray-100 transition-colors duration-300">
       <Header
         onNavigate={handleNavigate}
         currentView={currentView}

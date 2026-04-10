@@ -34,25 +34,25 @@ const HowItWorks = () => {
     ];
 
     return (
-        <section className="py-24 bg-gray-50">
+        <section className="py-24 bg-gray-50 dark:bg-dark-bg transition-colors duration-300">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="text-center mb-20">
-                    <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+                    <h2 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4">
                         How It <span className="text-blue-600">Works</span>
                     </h2>
-                    <p className="text-xl text-gray-600">
+                    <p className="text-xl text-gray-600 dark:text-gray-300">
                         Transform any content into a complete learning experience in just four simple steps
                     </p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 relative">
                     {/* Connector Line (Desktop only) */}
-                    <div className="hidden lg:block absolute top-[60px] left-[10%] right-[10%] h-[2px] bg-gray-200 -z-0"></div>
+                    <div className="hidden lg:block absolute top-[60px] left-[10%] right-[10%] h-[2px] bg-gray-200 dark:bg-gray-700 -z-0"></div>
 
                     {steps.map((step, index) => (
-                        <div key={index} className="relative z-10 flex flex-col items-center text-center bg-white p-6 rounded-2xl shadow-sm md:bg-transparent md:shadow-none md:p-0">
+                        <div key={index} className="relative z-10 flex flex-col items-center text-center bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm md:bg-transparent md:dark:bg-transparent md:shadow-none md:p-0 transition-colors duration-300">
                             {/* Step Number Bubble */}
-                            <div className="absolute top-0 right-10 -mt-2 bg-blue-600 text-white text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full border-2 border-white lg:right-4 lg:-mt-0 lg:left-[55%] lg:top-0">
+                            <div className="absolute top-0 right-10 -mt-2 bg-blue-600 text-white text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full border-2 border-white dark:border-gray-800 md:dark:border-dark-bg lg:right-4 lg:-mt-0 lg:left-[55%] lg:top-0">
                                 {step.number}
                             </div>
 
@@ -60,8 +60,8 @@ const HowItWorks = () => {
                                 {step.icon}
                             </div>
 
-                            <h3 className="text-xl font-bold text-gray-900 mb-4">{step.title}</h3>
-                            <p className="text-gray-600 text-sm leading-relaxed">
+                            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">{step.title}</h3>
+                            <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed">
                                 {step.description}
                             </p>
                         </div>

@@ -8,7 +8,7 @@ interface CTASectionProps {
 
 const CTASection: React.FC<CTASectionProps> = ({ onGetStarted, onViewExamples }) => {
     return (
-        <section className="py-24 px-4 sm:px-6 lg:px-8 bg-white">
+        <section className="py-24 px-4 sm:px-6 lg:px-8 bg-white dark:bg-[#050505] transition-colors duration-300">
             <div className="max-w-7xl mx-auto">
                 <div className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-blue-500 via-teal-400 to-yellow-400 px-8 py-20 text-center shadow-2xl">
 

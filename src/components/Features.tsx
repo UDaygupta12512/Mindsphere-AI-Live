@@ -54,30 +54,30 @@ const Features = () => {
     ];
 
     return (
-        <section className="py-24 bg-white">
+        <section className="py-24 bg-white dark:bg-gray-900 transition-colors duration-300">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="text-center mb-16">
-                    <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+                    <h2 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4">
                         Everything You Need to <span className="text-green-500">Learn Faster</span>
                     </h2>
-                    <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+                    <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
                         Our AI-powered platform transforms any content into a complete learning experience with all the tools you need to master new skills.
                     </p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                     {features.map((feature, index) => (
-                        <div key={index} className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+                        <div key={index} className="bg-white dark:bg-gray-800 p-8 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow">
                             <div className="flex justify-between items-start mb-6">
                                 <div className={`${feature.color} p-4 rounded-xl shadow-lg shadow-blue-200`}>
                                     {feature.icon}
                                 </div>
-                                <span className={`${feature.tagColor} px-3 py-1 rounded-full text-xs font-semibold`}>
+                                <span className={`${feature.tagColor} dark:bg-orange-900/30 dark:text-orange-400 px-3 py-1 rounded-full text-xs font-semibold`}>
                                     {feature.tag}
                                 </span>
                             </div>
-                            <h3 className="text-xl font-bold text-gray-900 mb-3">{feature.title}</h3>
-                            <p className="text-gray-600 leading-relaxed">
+                            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3">{feature.title}</h3>
+                            <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
                                 {feature.description}
                             </p>
                         </div>

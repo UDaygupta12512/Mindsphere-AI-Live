@@ -47,11 +47,11 @@ const StatCard: React.FC<StatCardProps> = ({ stat }) => {
 	});
 
   return (
-    <div ref={ref} className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all">
+    <div ref={ref} className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-medium text-gray-600 mb-1">{stat.label}</p>
-          <p className="text-3xl font-bold text-gray-900">{displayValue}</p>
+          <p className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{stat.label}</p>
+          <p className="text-3xl font-bold text-gray-900 dark:text-white">{displayValue}</p>
         </div>
         <div className={`p-3 rounded-lg ${stat.color}`}>
           {React.cloneElement(stat.icon, { className: 'h-6 w-6 text-white' })}
@@ -143,8 +143,8 @@ const Dashboard: React.FC<DashboardProps> = ({
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 dark:from-dark-bg dark:to-gray-900 transition-colors duration-300 z-0">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
         {/* Welcome Banner */}
         <div className="mb-8">
           <WelcomeBanner
@@ -182,25 +182,25 @@ const Dashboard: React.FC<DashboardProps> = ({
                     </p>
                     <div className="grid grid-cols-3 gap-3 mb-4">
                       {srsStats.atRisk > 0 && (
-                        <div className="bg-white/20 rounded-lg p-3 backdrop-blur">
+                        <div className="bg-white dark:bg-gray-800/20 rounded-lg p-3 backdrop-blur">
                           <div className="text-2xl font-bold">{srsStats.atRisk}</div>
                           <div className="text-xs opacity-90">At Risk</div>
                         </div>
                       )}
                       {srsStats.needsReview > 0 && (
-                        <div className="bg-white/20 rounded-lg p-3 backdrop-blur">
+                        <div className="bg-white dark:bg-gray-800/20 rounded-lg p-3 backdrop-blur">
                           <div className="text-2xl font-bold">{srsStats.needsReview}</div>
                           <div className="text-xs opacity-90">Need Review</div>
                         </div>
                       )}
                       {srsStats.mastered > 0 && (
-                        <div className="bg-white/20 rounded-lg p-3 backdrop-blur">
+                        <div className="bg-white dark:bg-gray-800/20 rounded-lg p-3 backdrop-blur">
                           <div className="text-2xl font-bold">{srsStats.mastered}</div>
                           <div className="text-xs opacity-90">Mastered</div>
                         </div>
                       )}
                     </div>
-                    <button className="bg-white text-purple-600 px-6 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-colors flex items-center space-x-2">
+                    <button className="bg-white dark:bg-gray-800 text-purple-600 px-6 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-colors flex items-center space-x-2">
                       <span>Review Now</span>
                       <ChevronRight className="h-5 w-5" />
                     </button>
@@ -213,7 +213,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             {/* Continue Learning */}
             {courses.filter(c => c.progress > 0 && c.progress < 100).length > 0 && (
               <div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                   <Play className="h-6 w-6 text-blue-500" />
                   Continue Learning
                 </h2>
@@ -225,7 +225,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                       <div
                         key={course._id || course.id}
                         onClick={() => onSelectCourse(course)}
-                        className="bg-white rounded-xl shadow-lg border border-gray-100 p-4 hover:shadow-xl transition-all cursor-pointer group"
+                        className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 p-4 hover:shadow-xl transition-all cursor-pointer group"
                       >
                         <div className="flex items-center gap-4">
                           <div className={`p-3 rounded-lg ${course.sourceType === 'youtube' ? 'bg-red-100' : 'bg-blue-100'}`}>
@@ -236,7 +236,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <h3 className="font-semibold text-gray-900 truncate">{course.title}</h3>
+                            <h3 className="font-semibold text-gray-900 dark:text-white truncate">{course.title}</h3>
                             <div className="flex items-center gap-2 mt-1">
                               <div className="flex-1 bg-gray-200 rounded-full h-2">
                                 <div
@@ -244,7 +244,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                   style={{ width: `${course.progress}%` }}
                                 />
                               </div>
-                              <span className="text-sm font-medium text-gray-600">{course.progress}%</span>
+                              <span className="text-sm font-medium text-gray-600 dark:text-gray-300">{course.progress}%</span>
                             </div>
                           </div>
                           <ChevronRight className="h-5 w-5 text-gray-400 group-hover:text-blue-500 transition-colors" />
@@ -257,8 +257,8 @@ const Dashboard: React.FC<DashboardProps> = ({
 
             {/* Recent Activity */}
             <div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">Recent Activity</h2>
-              <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Recent Activity</h2>
+              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 p-6">
                 {courses.length > 0 ? (
                   <div className="space-y-4">
                     {courses.slice(0, 3).map((course) => (
@@ -271,11 +271,11 @@ const Dashboard: React.FC<DashboardProps> = ({
                           )}
                         </div>
                         <div className="flex-1">
-                          <h3 className="font-semibold text-gray-900">{course.title}</h3>
-                          <p className="text-sm text-gray-600">Created {new Date(course.createdAt).toLocaleDateString()}</p>
+                          <h3 className="font-semibold text-gray-900 dark:text-white">{course.title}</h3>
+                          <p className="text-sm text-gray-600 dark:text-gray-300">Created {new Date(course.createdAt).toLocaleDateString()}</p>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-medium text-gray-900">{course.progress}% Complete</p>
+                          <p className="text-sm font-medium text-gray-900 dark:text-white">{course.progress}% Complete</p>
                           <div className="w-24 bg-gray-200 rounded-full h-2 mt-1">
                             <div
                               className="bg-blue-600 h-2 rounded-full transition-all"
@@ -289,8 +289,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                 ) : (
                   <div className="text-center py-12">
                     <Target className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">No courses yet</h3>
-                    <p className="text-gray-600 mb-6">Start your learning journey by creating your first course</p>
+                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No courses yet</h3>
+                    <p className="text-gray-600 dark:text-gray-300 mb-6">Start your learning journey by creating your first course</p>
                     <button
                       aria-label="Create First Course"
                       onClick={onCreateCourse}
@@ -327,12 +327,12 @@ const Dashboard: React.FC<DashboardProps> = ({
         {/* Courses Grid */}
         {courses.length > 0 && (
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">All Courses</h2>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">All Courses</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {courses.map((course) => (
                 <div
                   key={course._id || course.id}
-                  className="bg-white rounded-2xl shadow-lg border border-gray-100 hover:shadow-xl transition-all cursor-pointer transform hover:scale-105"
+                  className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 hover:shadow-xl transition-all cursor-pointer transform hover:scale-105"
                   onClick={() => onSelectCourse(course)}
                 >
                   <div className="p-6">
@@ -347,10 +347,10 @@ const Dashboard: React.FC<DashboardProps> = ({
                       <span className="text-sm font-medium text-gray-500">{course.duration}</span>
                     </div>
                     
-                    <h3 className="text-xl font-bold text-gray-900 mb-2 line-clamp-2">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2 line-clamp-2">
                       {course.title}
                     </h3>
-                    <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+                    <p className="text-gray-600 dark:text-gray-300 text-sm mb-4 line-clamp-2">
                       {course.description}
                     </p>
                     
@@ -375,7 +375,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         </span>
                       ))}
                       {course.topics.length > 3 && (
-                        <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
+                        <span className="px-2 py-1 bg-gray-100 text-gray-600 dark:text-gray-300 text-xs rounded-full">
                           +{course.topics.length - 3} more
                         </span>
                       )}
@@ -384,7 +384,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
                         <div className="flex justify-between text-sm mb-1">
-                          <span className="text-gray-600">Progress</span>
+                          <span className="text-gray-600 dark:text-gray-300">Progress</span>
                           <span className="font-medium">{course.progress}%</span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">

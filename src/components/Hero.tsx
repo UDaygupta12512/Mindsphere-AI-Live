@@ -70,11 +70,11 @@ const CountUpStat: React.FC<{ value: string; label: string }> = ({ value, label 
   };
 
   return (
-    <div ref={ref} className="text-center p-8 bg-[#111]/80 backdrop-blur-xl rounded-2xl border border-white/10 hover:border-neon-purple/60 hover:bg-[#1a1a1a] transition-all duration-300 group shadow-2xl">
+    <div ref={ref} className="text-center p-8 bg-white/80 dark:bg-[#111]/80 backdrop-blur-xl rounded-2xl border border-gray-200 dark:border-white/10 hover:border-blue-400 dark:hover:border-neon-purple/60 hover:bg-gray-50 dark:hover:bg-[#1a1a1a] transition-all duration-300 group shadow-lg dark:shadow-2xl">
       <div className="text-5xl font-black text-neon-blue drop-shadow-[0_0_10px_rgba(0,243,255,0.6)] mb-4 group-hover:scale-110 transition-transform duration-300 inline-block">
         {displayValue}
       </div>
-      <div className="text-xl text-gray-300 font-medium group-hover:text-white transition-colors">{label}</div>
+      <div className="text-xl text-gray-600 dark:text-gray-300 font-medium group-hover:text-gray-900 dark:group-hover:text-white transition-colors">{label}</div>
     </div>
   );
 };
@@ -89,7 +89,7 @@ const Hero: React.FC<HeroProps> = ({ onGetStarted }) => {
   ];
 
   return (
-    <div className="min-h-[90vh] bg-[#050505] text-white overflow-hidden relative flex items-center">
+    <div className="min-h-[90vh] bg-gray-50 dark:bg-[#050505] text-gray-900 dark:text-white overflow-hidden relative flex items-center transition-colors duration-300">
       {/* Intense Background Glows */}
       <div className="absolute top-[-20%] right-[-10%] w-[800px] h-[800px] bg-neon-purple/30 rounded-full mix-blend-screen filter blur-[120px] opacity-40 animate-blob"></div>
       <div className="absolute bottom-[-20%] left-[-10%] w-[800px] h-[800px] bg-neon-blue/30 rounded-full mix-blend-screen filter blur-[120px] opacity-40 animate-blob animation-delay-2000"></div>
@@ -99,21 +99,21 @@ const Hero: React.FC<HeroProps> = ({ onGetStarted }) => {
 
           <div className="text-left z-10">
             <h1 className="text-5xl md:text-6xl lg:text-7xl font-black tracking-tight mb-8 leading-[1.1]">
-              <span className="bg-clip-text text-transparent bg-gradient-to-r from-cyan-300 via-neon-blue to-purple-400 drop-shadow-[0_0_25px_rgba(0,243,255,0.4)]">
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-600 dark:from-cyan-300 via-purple-600 dark:via-neon-blue to-indigo-600 dark:to-purple-400 drop-shadow-sm dark:drop-shadow-[0_0_25px_rgba(0,243,255,0.4)]">
                 Transform Your
               </span>
               <br />
-              <span className="text-white drop-shadow-xl">Learning Journey</span>
+              <span className="text-gray-900 dark:text-white drop-shadow-sm dark:drop-shadow-xl">Learning Journey</span>
             </h1>
 
-            <p className="text-2xl text-gray-200 mb-12 leading-relaxed max-w-2xl border-l-4 border-neon-blue pl-8 font-light">
-              Join thousands of learners who create personalized, AI-powered courses in <span className="text-neon-blue font-bold">minutes</span>. Experience the future of education today.
+            <p className="text-2xl text-gray-700 dark:text-gray-200 mb-12 leading-relaxed max-w-2xl border-l-4 border-blue-600 dark:border-neon-blue pl-8 font-light">
+              Join thousands of learners who create personalized, AI-powered courses in <span className="text-blue-600 dark:text-neon-blue font-bold">minutes</span>. Experience the future of education today.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-6 mb-20">
               <button
                 onClick={onGetStarted}
-                className="group relative bg-[#00f3ff] text-black text-lg px-10 py-5 rounded-2xl font-bold overflow-hidden transition-all hover:scale-105 shadow-[0_0_40px_rgba(0,243,255,0.4)]"
+                className="group relative bg-blue-600 dark:bg-[#00f3ff] text-white dark:text-black text-lg px-10 py-5 rounded-2xl font-bold overflow-hidden transition-all hover:scale-105 shadow-lg dark:shadow-[0_0_40px_rgba(0,243,255,0.4)]"
               >
                 <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
                 <div className="relative z-10 flex items-center gap-3">
@@ -123,7 +123,7 @@ const Hero: React.FC<HeroProps> = ({ onGetStarted }) => {
               </button>
               <button
                 onClick={() => setIsDemoModalOpen(true)}
-                className="px-10 py-5 text-lg border-2 border-neon-purple/50 text-white rounded-2xl font-medium hover:bg-neon-purple/20 transition-all backdrop-blur-md shadow-[0_0_30px_rgba(188,19,254,0.2)] hover:shadow-[0_0_50px_rgba(188,19,254,0.4)]"
+                className="px-10 py-5 text-lg border-2 border-purple-600/50 dark:border-neon-purple/50 text-gray-900 dark:text-white rounded-2xl font-medium hover:bg-purple-50 dark:hover:bg-neon-purple/20 transition-all backdrop-blur-md shadow-sm dark:shadow-[0_0_30px_rgba(188,19,254,0.2)] hover:dark:shadow-[0_0_50px_rgba(188,19,254,0.4)]"
               >
                 View Examples
               </button>
